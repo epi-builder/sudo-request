@@ -1,0 +1,20 @@
+[project]
+name = "sudo-request"
+version = "0.1.0"
+description = "Telegram-approved temporary broad NOPASSWD sudoers window for personal macOS agents"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+sudo-request = "sudo_request.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.0,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
