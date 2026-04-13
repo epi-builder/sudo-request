@@ -79,11 +79,17 @@ Current mitigations:
 - CLI cleanup diagnostics distinguish harmless daemon-restart disconnects from
   cases where the broad rule still exists.
 - `status` reports `dropin_exists`.
+- Cleanup failure paths send best-effort Telegram critical alerts when the
+  broad rule may remain installed.
+- `doctor` checks owner/mode/kind for the sudoers directory and broad rule
+  drop-in.
 
 Residual risk:
 - Filesystem/permission/launchd failure could prevent cleanup.
-- Cleanup failure currently logs locally but does not send a Telegram critical
-  alert.
+- Telegram critical alerts are best-effort and can fail if the bot token,
+  network, or configured chats are unavailable.
+- Daemon restarts can still lose in-memory request context until active request
+  state is persisted across daemon lifetimes.
 
 4. Daemon IPC misuse by local processes
 
@@ -96,12 +102,13 @@ Current mitigations:
 - Username is resolved from uid and validated before sudoers rendering.
 - The daemon uses the peer user's config and allowed Telegram users.
 - Only one in-flight request is allowed.
+- `doctor` checks daemon socket owner/mode/kind and socket directory
+  permissions.
 
 Residual risk:
 - Other local users can send requests for themselves if they have valid config
   and Telegram approval.
 - The socket mode is broader than necessary for a personal single-user tool.
-- `doctor` does not yet verify socket owner/mode.
 
 5. Telegram account or bot token compromise
 
@@ -150,11 +157,18 @@ Current mitigations:
 - Self-reinstall is performed as `/usr/bin/sudo ... uv run sudo-request install`,
   so the approved command is explicit.
 - Cleanup diagnostics tolerate daemon restart only when the broad rule is gone.
+- `status` reports active request phase, command metadata, requested window,
+  window expiry, daemon pid, and whether the broad sudo rule exists.
+- Telegram approval messages are updated to `[RUNNING]`, `[DONE exit=N]`, or
+  failure statuses when lifecycle events reach the daemon.
 
 Residual risk:
 - Self-reinstall still restarts the daemon during an active window.
 - A failed install halfway through could leave daemon availability degraded,
   though startup cleanup and status checks reduce stale-rule risk.
+- Because active request state is still in memory only, daemon restart during
+  an active command can leave Telegram with stale lifecycle status even when the
+  sudoers drop-in has been cleaned up.
 
 8. Audit log tampering or loss
 
@@ -185,16 +199,25 @@ Residual risk:
 
 ## Highest Priority Mitigations
 
-1. Add Telegram critical alert when cleanup fails and the broad rule remains.
-2. Extend `status` with phase, command, requested window, expiry, and daemon pid.
-3. Extend `doctor` to verify socket, launchd plist, log directory, and sudoers
-   drop-in owner/mode.
-4. Add Telegram `[RUNNING]` and `[DONE exit=N]` status updates so the user knows
-   when the command starts and finishes.
-5. Prefer executing the resolved executable path, or explicitly document and
+Completed since the original audit:
+
+- Telegram critical alert when cleanup fails and the broad rule may remain.
+- `status` output with active phase, command, requested window, expiry,
+  daemon pid, and `dropin_exists`.
+- `doctor` owner/mode/kind checks for daemon socket, socket directory, launchd
+  plist, install paths, sudoers directory, and broad rule drop-in.
+- Telegram `[RUNNING]`, `[DONE exit=N]`, and failure status updates for
+  lifecycle visibility.
+
+Remaining highest priority mitigations:
+
+1. Persist daemon active request state so daemon restart/update can recover
+   cleanup context and Telegram lifecycle status.
+2. Prefer executing the resolved executable path, or explicitly document and
    validate that the original argv execution can differ from the displayed path.
-6. Consider tightening socket permissions if multi-user local scenarios matter.
-7. Add rate limiting or backoff for repeated requests.
+3. Consider tightening socket permissions if multi-user local scenarios matter.
+4. Add rate limiting or backoff for repeated requests.
+5. Make timeout/deny/daemon failure stderr messages more consistent for agents.
 
 ## Non-Goals for v1
 
