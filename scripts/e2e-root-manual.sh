@@ -28,7 +28,7 @@ echo "using: $SUDO_REQUEST_BIN"
 run_sudo_request --help >/dev/null
 
 echo "[2/6] daemon status"
-run_sudo_request status >"$STATUS_OUT"
+run_sudo_request status --json >"$STATUS_OUT"
 grep -q '"ok": true' "$STATUS_OUT"
 
 echo "[3/6] verify sudo window is closed before test"
@@ -46,7 +46,7 @@ cat "$RUN_ERR" >&2
 grep -qx '0' "$RUN_OUT"
 
 echo "[5/6] verify daemon reports no stale drop-in"
-run_sudo_request status >"$STATUS_OUT"
+run_sudo_request status --json >"$STATUS_OUT"
 grep -q '"dropin_exists": false' "$STATUS_OUT"
 
 echo "[6/6] verify sudo window is closed after test"
