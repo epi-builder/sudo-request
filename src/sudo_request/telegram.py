@@ -48,6 +48,7 @@ class TelegramClient:
             f"Requested command: {format_argv(payload['argv'])}\n"
             f"Resolved executable: {payload['resolved_executable']}\n"
             f"Parent process: {payload['parent_process']}\n"
+            f"Requested sudo window: {payload['requested_window_seconds']}s (max {payload['max_window_seconds']}s)\n"
             f"Expires at: {payload['expires_at']}\n"
             f"SHA256 payload hash: {payload['payload_hash']}\n\n"
             "WARNING: while approved, this local user can run passwordless sudo from any process."

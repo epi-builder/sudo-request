@@ -15,7 +15,7 @@ from .audit import append_jsonl
 from .config import load_config, read_token
 from .constants import DAEMON_LOG, DROPIN_PATH, EXIT_DAEMON_FAILURE, SOCKET_DIR, SOCKET_PATH
 from .ipc import recv_json_line, send_json_line
-from .payload import build_payload, validate_username
+from .payload import build_payload, payload_hash, validate_username
 from .sudoers import cleanup_broad_rule, install_broad_rule
 from .telegram import TelegramClient
 
@@ -102,7 +102,24 @@ class RequestHandler(socketserver.StreamRequestHandler):
         cwd = str(message.get("cwd") or home)
         path_value = str(message.get("path") or os.defpath)
         cfg = load_config(home)
+        requested_window_seconds = message.get("window_seconds")
+        if requested_window_seconds is None:
+            window_seconds = cfg.broad_window_seconds_default
+        else:
+            window_seconds = int(requested_window_seconds)
+        if window_seconds <= 0:
+            return {"ok": False, "status": "policy_block", "exit_code": 125, "error": "window_seconds must be positive"}
+        if window_seconds > cfg.broad_window_seconds_max:
+            return {
+                "ok": False,
+                "status": "policy_block",
+                "exit_code": 125,
+                "error": f"requested window_seconds {window_seconds}s exceeds max {cfg.broad_window_seconds_max}s",
+            }
         payload = build_payload(uid, user, str(home), cwd, argv, path_value, cfg.approval_timeout_seconds)
+        payload["requested_window_seconds"] = window_seconds
+        payload["max_window_seconds"] = cfg.broad_window_seconds_max
+        payload["payload_hash"] = payload_hash({k: v for k, v in payload.items() if k != "payload_hash"})
         request_id = payload["request_id"]
 
         if not STATE.begin(request_id, user):
@@ -127,13 +144,13 @@ class RequestHandler(socketserver.StreamRequestHandler):
                 return {"ok": False, "status": "denied", "exit_code": 126, "request_id": request_id}
 
             install_broad_rule(user)
-            timer = threading.Timer(cfg.broad_window_seconds, watchdog_cleanup, args=(request_id,))
+            timer = threading.Timer(window_seconds, watchdog_cleanup, args=(request_id,))
             timer.daemon = True
             with STATE.lock:
                 STATE.cleanup_timer = timer
             timer.start()
-            append_jsonl(DAEMON_LOG, "window_opened", {"request_id": request_id, "user": user, "dropin": str(DROPIN_PATH), "seconds": cfg.broad_window_seconds})
-            return {"ok": True, "status": "approved", "request_id": request_id, "payload_hash": payload["payload_hash"], "window_seconds": cfg.broad_window_seconds}
+            append_jsonl(DAEMON_LOG, "window_opened", {"request_id": request_id, "user": user, "dropin": str(DROPIN_PATH), "seconds": window_seconds})
+            return {"ok": True, "status": "approved", "request_id": request_id, "payload_hash": payload["payload_hash"], "window_seconds": window_seconds}
         except Exception as exc:
             cleanup_broad_rule()
             STATE.clear(request_id)

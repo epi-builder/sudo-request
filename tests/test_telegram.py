@@ -16,6 +16,8 @@ class TelegramTests(unittest.TestCase):
             "argv": ["/bin/echo", "ok"],
             "resolved_executable": "/bin/echo",
             "parent_process": {"pid": 1},
+            "requested_window_seconds": 30,
+            "max_window_seconds": 300,
             "expires_at": 1,
             "payload_hash": "a" * 64,
             "request_id": "r" * 24,

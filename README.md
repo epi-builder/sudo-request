@@ -65,7 +65,8 @@ Create `~/.config/sudo-request/config.toml`:
 telegram_bot_token_file = "~/.config/sudo-request/telegram_bot_token"
 telegram_allowed_user_ids = [123456789]
 approval_timeout_seconds = 90
-broad_window_seconds = 30
+broad_window_seconds_default = 30
+broad_window_seconds_max = 300
 ```
 
 Put the Telegram bot token in:
@@ -79,4 +80,10 @@ Put the Telegram bot token in:
 ```bash
 uv run sudo-request doctor
 uv run python -m unittest discover -s tests
+```
+
+Request a custom window within the configured max:
+
+```bash
+sudo-request run --window-seconds 120 -- /usr/bin/sudo /usr/bin/id -u
 ```

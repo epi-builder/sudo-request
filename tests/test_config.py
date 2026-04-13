@@ -18,7 +18,8 @@ class ConfigTests(unittest.TestCase):
                     'telegram_bot_token_file = "~/.config/sudo-request/token"',
                     "telegram_allowed_user_ids = [123, 456]",
                     "approval_timeout_seconds = 12",
-                    "broad_window_seconds = 7",
+                    "broad_window_seconds_default = 7",
+                    "broad_window_seconds_max = 20",
                 ]),
                 encoding="utf-8",
             )
@@ -26,7 +27,25 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(cfg.telegram_bot_token_file, cfg_dir / "token")
             self.assertEqual(cfg.telegram_allowed_user_ids, [123, 456])
             self.assertEqual(cfg.approval_timeout_seconds, 12)
+            self.assertEqual(cfg.broad_window_seconds_default, 7)
+            self.assertEqual(cfg.broad_window_seconds_max, 20)
             self.assertEqual(cfg.broad_window_seconds, 7)
+
+    def test_load_config_accepts_legacy_broad_window_seconds(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            cfg_dir = home / ".config" / "sudo-request"
+            cfg_dir.mkdir(parents=True)
+            (cfg_dir / "config.toml").write_text(
+                "\n".join([
+                    "telegram_allowed_user_ids = [123]",
+                    "broad_window_seconds = 9",
+                ]),
+                encoding="utf-8",
+            )
+            cfg = load_config(home)
+            self.assertEqual(cfg.broad_window_seconds_default, 9)
+            self.assertGreaterEqual(cfg.broad_window_seconds_max, 9)
 
 
 if __name__ == "__main__":
