@@ -5,10 +5,11 @@ import time
 from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from sudo_request.config import Config
-from sudo_request.cli import command_run, ipc_request_with_heartbeat, render_launchd_plist
+from sudo_request.cli import close_request_with_diagnostics, command_run, ipc_request_with_heartbeat, render_launchd_plist
 
 
 class CliTests(unittest.TestCase):
@@ -33,6 +34,27 @@ class CliTests(unittest.TestCase):
             with redirect_stderr(StringIO()) as stderr:
                 self.assertEqual(ipc_request_with_heartbeat({"type": "status"}, cfg), {"ok": True})
         self.assertIn("still waiting for Telegram approval", stderr.getvalue())
+
+    def test_cleanup_diagnostics_downgrades_restart_disconnect_when_rule_is_gone(self) -> None:
+        with TemporaryDirectory() as tmp:
+            dropin = Path(tmp) / "sudo-request-broad"
+            with patch("sudo_request.cli.DROPIN_PATH", dropin):
+                with patch("sudo_request.cli.ipc_request", side_effect=FileNotFoundError("socket missing")):
+                    with redirect_stderr(StringIO()) as stderr:
+                        close_request_with_diagnostics("req")
+        self.assertIn("could not reach daemon, but broad sudo rule is not installed", stderr.getvalue())
+
+    def test_cleanup_diagnostics_warns_when_rule_remains_after_disconnect(self) -> None:
+        with TemporaryDirectory() as tmp:
+            dropin = Path(tmp) / "sudo-request-broad"
+            dropin.write_text("epikem ALL=(ALL) NOPASSWD: ALL\n", encoding="utf-8")
+            with patch("sudo_request.cli.DROPIN_PATH", dropin):
+                with patch("sudo_request.cli.ipc_request", side_effect=FileNotFoundError("socket missing")):
+                    with redirect_stderr(StringIO()) as stderr:
+                        close_request_with_diagnostics("req")
+        output = stderr.getvalue()
+        self.assertIn("cleanup request failed", output)
+        self.assertIn("broad sudo rule still exists", output)
 
 
 if __name__ == "__main__":

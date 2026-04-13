@@ -15,7 +15,7 @@ from typing import Any
 
 from .audit import append_jsonl_best_effort, user_audit_path
 from .config import Config, config_path, load_config
-from .constants import BIN_PATH, EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK, INSTALL_PREFIX, LAUNCHD_PLIST, SOCKET_PATH
+from .constants import BIN_PATH, DROPIN_PATH, EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK, INSTALL_PREFIX, LAUNCHD_PLIST, SOCKET_PATH
 from .daemon import run_foreground
 from .ipc import recv_json_line, send_json_line
 from .sudoers import cleanup_broad_rule
@@ -110,12 +110,7 @@ def command_run(cmd: list[str], window_seconds: int | None = None) -> int:
         proc = subprocess.run(cmd)
         return int(proc.returncode)
     finally:
-        try:
-            close_response = ipc_request({"type": "close_request", "request_id": request_id})
-            if not close_response.get("ok"):
-                print(f"sudo-request: cleanup warning: {close_response}", file=sys.stderr)
-        except Exception as exc:
-            print(f"sudo-request: cleanup request failed: {exc}", file=sys.stderr)
+        close_request_with_diagnostics(request_id)
         subprocess.run(["/usr/bin/sudo", "-k"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         append_jsonl_best_effort(user_audit_path(Path.home()), "command_finished", {"request_id": request_id})
 
@@ -148,6 +143,30 @@ def ipc_request_with_heartbeat(message: dict[str, Any], cfg: Config) -> dict[str
     if error:
         raise error[0]
     return result
+
+
+def close_request_with_diagnostics(request_id: str) -> None:
+    try:
+        close_response = ipc_request({"type": "close_request", "request_id": request_id})
+    except Exception as exc:
+        if DROPIN_PATH.exists():
+            print(
+                f"sudo-request: cleanup request failed and broad sudo rule still exists at {DROPIN_PATH}: {exc}",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "sudo-request: cleanup request could not reach daemon, but broad sudo rule is not installed",
+                file=sys.stderr,
+            )
+        return
+
+    if close_response.get("ok"):
+        return
+    if DROPIN_PATH.exists():
+        print(f"sudo-request: cleanup warning: {close_response}; broad sudo rule still exists at {DROPIN_PATH}", file=sys.stderr)
+    else:
+        print(f"sudo-request: cleanup warning: {close_response}; broad sudo rule is not installed", file=sys.stderr)
 
 
 def print_ipc(message: dict[str, Any]) -> int:
