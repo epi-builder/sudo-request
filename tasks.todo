@@ -1,6 +1,6 @@
 개선사항들:
-- [ ] approval 이후 실제 command 실행 시작 시 `sudo-request: running command...` 메시지 출력
-- [ ] command 종료 시 `sudo-request: command exited with code N` 메시지 출력
+- [x] approval 이후 실제 command 실행 시작 시 `sudo-request: running command...` 메시지 출력
+- [x] command 종료 시 `sudo-request: command exited with code N` 메시지 출력
 - [ ] Telegram 메시지를 승인 이후 `[RUNNING]`, 종료 후 `[DONE exit=N]` 상태로 업데이트
 - [ ] cleanup 실패 또는 broad sudo rule 잔존 시 Telegram critical 알림 전송
 - [ ] `sudo-request status`에 active command, phase, window expires_at local time, daemon pid 등 실시간 상태 확장

@@ -122,13 +122,17 @@ def command_run(cmd: list[str], window_seconds: int | None = None) -> int:
     request_id = str(response["request_id"])
     print(f"sudo-request: approved; broad sudo window open for up to {response.get('window_seconds')}s", file=sys.stderr)
     append_jsonl_best_effort(user_audit_path(Path.home()), "command_started", {"request_id": request_id, "argv": cmd})
+    print("sudo-request: running command...", file=sys.stderr)
+    returncode = EXIT_DAEMON_FAILURE
     try:
         proc = subprocess.run(cmd)
-        return int(proc.returncode)
+        returncode = int(proc.returncode)
+        return returncode
     finally:
+        print(f"sudo-request: command exited with code {returncode}", file=sys.stderr)
         close_request_with_diagnostics(request_id, ipc_request)
         subprocess.run(["/usr/bin/sudo", "-k"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        append_jsonl_best_effort(user_audit_path(Path.home()), "command_finished", {"request_id": request_id})
+        append_jsonl_best_effort(user_audit_path(Path.home()), "command_finished", {"request_id": request_id, "exit_code": returncode})
 
 
 def ipc_request(message: dict[str, Any]) -> dict[str, Any]:
