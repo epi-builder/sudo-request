@@ -7,7 +7,7 @@
   텔레그램 메시지 본문 구성과 시간/argv 표시 로직을 Telegram transport 코드에서 분리한다.
   완료 기준은 메시지 포맷 변경이 `approval/message.py` 안에서 대부분 처리되고, Telegram transport는 메시지를 보내거나 수정하는 책임만 갖는 것이다.
 
-- [ ] Telegram callback 검증과 approval decision 모델을 `approval/decision.py`로 분리
+- [x] Telegram callback 검증과 approval decision 모델을 `approval/decision.py`로 분리
   callback data 파싱, request id/hash/nonce 검증, allowed user 검증, one-time decision 결과 모델을 Telegram HTTP transport에서 분리한다.
   완료 기준은 `telegram.py`가 네트워크 I/O와 Telegram API 호출에 집중하고, callback 검증 단위 테스트가 `approval/decision.py`를 직접 검증하는 것이다.
 

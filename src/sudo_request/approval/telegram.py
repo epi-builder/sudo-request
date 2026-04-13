@@ -4,17 +4,10 @@ import json
 import time
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
 from typing import Any
 
+from .decision import ApprovalResult, approval_callback_data, evaluate_callback, timeout_result
 from .message import approval_message_text
-
-
-@dataclass(frozen=True)
-class ApprovalResult:
-    status: str
-    approver_id: int | None = None
-    message: str | None = None
 
 
 class TelegramClient:
@@ -43,15 +36,10 @@ class TelegramClient:
 
     def send_approval_request(self, chat_id: int, payload: dict[str, Any]) -> int:
         text = approval_message_text(payload, "PENDING")
-        nonce = payload["nonce"]
-        request_id = payload["request_id"]
-        digest = payload["payload_hash"]
-        digest_prefix = digest[:16]
-        nonce_prefix = nonce[:8]
         reply_markup = {
             "inline_keyboard": [[
-                {"text": "Approve once", "callback_data": f"a:{request_id}:{digest_prefix}:{nonce_prefix}"},
-                {"text": "Deny", "callback_data": f"d:{request_id}:{digest_prefix}:{nonce_prefix}"},
+                {"text": "Approve once", "callback_data": approval_callback_data("a", payload)},
+                {"text": "Deny", "callback_data": approval_callback_data("d", payload)},
             ]]
         }
         result = self._post("sendMessage", {"chat_id": chat_id, "text": text, "reply_markup": reply_markup})
@@ -82,9 +70,6 @@ class TelegramClient:
     def wait_for_approval_decision(self, payload: dict[str, Any], allowed_user_ids: list[int], timeout_seconds: int) -> ApprovalResult:
         deadline = time.time() + timeout_seconds
         offset = 0
-        expected_request_id = payload["request_id"]
-        expected_hash = payload["payload_hash"]
-        expected_nonce = payload["nonce"]
         while time.time() < deadline:
             wait = max(1, min(20, int(deadline - time.time())))
             raw = self._get("getUpdates", {"timeout": wait, "offset": offset, "allowed_updates": json.dumps(["callback_query"])}, timeout=wait + 5)
@@ -94,29 +79,18 @@ class TelegramClient:
                 callback = update.get("callback_query")
                 if not callback:
                     continue
-                user = callback.get("from", {})
-                user_id = int(user.get("id", 0))
-                data = str(callback.get("data", ""))
-                parts = data.split(":")
-                if len(parts) != 4:
+                decision = evaluate_callback(callback, payload, allowed_user_ids)
+                if decision.status == "ignored":
                     continue
-                action, request_id, digest, nonce = parts
-                if request_id != expected_request_id or digest != expected_hash[:16] or nonce != expected_nonce[:8]:
-                    continue
-                if user_id not in allowed_user_ids:
-                    self.answer_callback(str(callback["id"]), "Not allowed")
-                    continue
-                if action == "a":
-                    self.answer_callback(str(callback["id"]), "Approved")
-                    self.mark_callback_status(callback, payload, "APPROVED")
-                    return ApprovalResult("approved", user_id)
-                if action == "d":
-                    self.answer_callback(str(callback["id"]), "Denied")
-                    self.mark_callback_status(callback, payload, "DENIED")
-                    return ApprovalResult("denied", user_id)
+                if decision.answer_text is not None and decision.callback_id is not None:
+                    self.answer_callback(decision.callback_id, decision.answer_text)
+                if decision.message_status is not None and decision.callback is not None:
+                    self.mark_callback_status(decision.callback, payload, decision.message_status)
+                if decision.is_terminal:
+                    return ApprovalResult(decision.status, decision.approver_id)
         for message in payload.get("approval_messages", []):
             chat_id = message.get("chat_id")
             message_id = message.get("message_id")
             if chat_id is not None and message_id is not None:
                 self.mark_status(int(chat_id), int(message_id), payload, "EXPIRED")
-        return ApprovalResult("timeout", None, "request expired by timeout")
+        return timeout_result()

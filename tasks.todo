@@ -13,7 +13,7 @@
 리팩토링:
 - [x] Telegram 상태 업데이트 API를 `send approval`, `mark status`, `wait decision` 책임으로 더 명시적으로 정리
 - [x] approval message formatting을 `approval/message.py` 같은 별도 모듈로 분리
-- [ ] Telegram callback 검증과 approval decision 모델을 `approval/decision.py`로 분리
+- [x] Telegram callback 검증과 approval decision 모델을 `approval/decision.py`로 분리
 - [ ] request lifecycle 모델을 dataclass로 정리
 - [ ] `DaemonState`를 active_request_id 중심에서 phase/command/expires_at을 담는 state object 중심으로 정리
 - [ ] daemon peer uid 조회 로직을 `daemon/peer.py`로 분리

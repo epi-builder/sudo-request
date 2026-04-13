@@ -120,6 +120,13 @@ Run the root/Telegram manual e2e after installing the daemon:
 scripts/e2e-root-manual.sh
 ```
 
+By default, the manual e2e uses the source checkout CLI through
+`uv run sudo-request`. To test the installed PATH wrapper instead:
+
+```bash
+SUDO_REQUEST_BIN=sudo-request scripts/e2e-root-manual.sh
+```
+
 The manual e2e asks for Telegram approval, verifies `/usr/bin/sudo /usr/bin/id -u`
 returns `0` during the approved run, and verifies passwordless sudo is closed
 after cleanup.
