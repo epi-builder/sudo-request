@@ -20,9 +20,12 @@
 - [ ] `DaemonState`를 active_request_id 중심에서 phase/command/expires_at을 담는 state object 중심으로 정리
 - [ ] daemon peer uid 조회 로직을 `daemon/peer.py`로 분리
 - [ ] daemon watchdog/TTL cleanup 로직을 `daemon/watchdog.py`로 분리
+- [ ] broad sudoers window 제어를 `daemon/sudo_window.py`로 분리
 - [x] daemon request dispatch/server 코드를 패키지화하되, `daemon.py` 파일명 충돌을 피하는 방식으로 단계적 이동
 - [ ] CLI 출력 메시지를 `output.py` 또는 app output helper로 분리
 - [ ] `doctor` 구현을 `app/doctor.py`로 분리
 - [ ] `run` command flow를 `app/run.py`로 분리
 - [ ] `status`, `cancel`, `cleanup` IPC command wrappers를 `app/status.py` 또는 `app/ipc_commands.py`로 분리
+- [ ] install/update/self-management 로직을 `app/install_commands.py`로 분리
 - [ ] 테스트 공통 fixture/helper를 `tests/helpers.py`로 분리
+- [ ] README, docs, audit-memo, sudo-request-run skill의 실행 경로와 책임 설명 동기화

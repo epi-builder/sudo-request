@@ -66,8 +66,7 @@ Only ignored artifacts should remain in `git status --short --ignored`.
 ## Follow-Up Tracking
 
 - Product improvements are in `tasks.todo`.
-- Structural refactoring steps are in `refactoring-structure.todo`.
+- Structural refactoring steps are also tracked in `tasks.todo`.
 - Security analysis is in `audit-memo.md`.
 
 When completing a listed item, update the relevant todo file in the same change.
-
