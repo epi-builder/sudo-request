@@ -16,8 +16,8 @@
 - [x] Telegram callback 검증과 approval decision 모델을 `approval/decision.py`로 분리
 - [x] 배포 애플리케이션 경계를 `app/cli`와 `app/daemon`으로 분리
 - [x] 공통 라이브러리 경계를 `lib` 또는 현재 shared module naming으로 명확히 정리
-- [ ] request lifecycle 모델을 dataclass로 정리
-- [ ] `DaemonState`를 active_request_id 중심에서 phase/command/expires_at을 담는 state object 중심으로 정리
+- [x] request lifecycle 모델을 dataclass로 정리
+- [x] `DaemonState`를 active_request_id 중심에서 phase/command/expires_at을 담는 state object 중심으로 정리
 - [ ] daemon peer uid 조회 로직을 `daemon/peer.py`로 분리
 - [ ] daemon watchdog/TTL cleanup 로직을 `daemon/watchdog.py`로 분리
 - [ ] broad sudoers window 제어를 `daemon/sudo_window.py`로 분리
