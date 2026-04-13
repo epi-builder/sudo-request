@@ -31,6 +31,49 @@ def approval_message_text(payload: dict[str, Any], status: str) -> str:
     ])
 
 
+def cleanup_critical_message_text(payload: dict[str, Any] | None, source: str, dropin_path: str) -> str:
+    title = "sudo-request [CRITICAL cleanup_failed]"
+    lines = [
+        title,
+        "=" * len(title),
+        "",
+        "Cleanup",
+        f"  Source:  {source}",
+        f"  Drop-in: {dropin_path}",
+        "  Status:  cleanup failed; broad sudo rule may still be installed.",
+        "",
+    ]
+    if payload is None:
+        lines.extend([
+            "Request",
+            "  Active request details are unavailable.",
+            "",
+        ])
+    else:
+        lines.extend([
+            "Request",
+            f"  Host: {payload['host']}",
+            f"  User: {payload['user']} (uid={payload['uid']})",
+            f"  Cwd:  {payload['cwd']}",
+            "",
+            "Command",
+            f"  {format_argv(payload['argv'])}",
+            f"  Resolved: {payload['resolved_executable']}",
+            "",
+            "Approval",
+            f"  Window:  {payload['requested_window_seconds']}s (max {payload['max_window_seconds']}s)",
+            f"  Expires: {format_local_timestamp(payload['expires_at'])}",
+            f"  Hash:    {payload['payload_hash']}",
+            "",
+        ])
+    lines.extend([
+        "Action",
+        "  Run sudo-request status and remove the drop-in if it is stale.",
+        "  Passwordless sudo may remain available for this local user.",
+    ])
+    return "\n".join(lines)
+
+
 def format_parent_process(parent_process: Any) -> str:
     if isinstance(parent_process, dict) and "pid" in parent_process:
         return f"pid={parent_process['pid']}"

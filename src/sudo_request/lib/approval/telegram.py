@@ -7,7 +7,7 @@ import urllib.request
 from typing import Any
 
 from .decision import ApprovalResult, approval_callback_data, evaluate_callback, timeout_result
-from .message import approval_message_text
+from .message import approval_message_text, cleanup_critical_message_text
 
 
 class TelegramClient:
@@ -43,6 +43,11 @@ class TelegramClient:
             ]]
         }
         result = self._post("sendMessage", {"chat_id": chat_id, "text": text, "reply_markup": reply_markup})
+        return int(result["message_id"])
+
+    def send_cleanup_critical_alert(self, chat_id: int, payload: dict[str, Any] | None, source: str, dropin_path: str) -> int:
+        text = cleanup_critical_message_text(payload, source, dropin_path)
+        result = self._post("sendMessage", {"chat_id": chat_id, "text": text}, timeout=10)
         return int(result["message_id"])
 
     def answer_callback(self, callback_id: str, text: str) -> None:

@@ -83,6 +83,15 @@ class DaemonState:
                 "active_request": request.to_status_dict() if request is not None else None,
             }
 
+    def notification_payload(self, request_id: str | None = None) -> tuple[int, dict[str, Any]] | None:
+        with self.lock:
+            request = self.active_request
+            if request is None:
+                return None
+            if request_id is not None and request.request_id != request_id:
+                return None
+            return request.uid, request.to_approval_payload()
+
 
 STATE = DaemonState()
 
@@ -203,16 +212,25 @@ class RequestHandler(socketserver.StreamRequestHandler):
             return {"ok": True, "status": "approved", "request_id": request_id, "payload_hash": payload["payload_hash"], "window_seconds": window_seconds}
         except Exception as exc:
             self.mark_failed_request_best_effort(telegram, payload, str(exc))
-            cleanup_broad_rule()
+            cleanup_ok = cleanup_broad_rule()
+            if not cleanup_ok:
+                self.send_cleanup_critical_alert_best_effort(uid, payload, "run_request_error")
             STATE.set_phase(request_id, RequestPhase.FAILED)
             STATE.clear(request_id)
-            append_jsonl(DAEMON_LOG, "request_failed", {"request_id": request_id, "error": str(exc)})
+            append_jsonl(DAEMON_LOG, "request_failed", {"request_id": request_id, "error": str(exc), "cleanup_ok": cleanup_ok})
             return {"ok": False, "status": "daemon_error", "exit_code": 127, "request_id": request_id, "error": str(exc)}
 
     def handle_close_request(self, message: dict[str, Any]) -> dict[str, Any]:
+        uid = peer_uid(self.request)
         request_id = str(message.get("request_id") or "")
+        notification = STATE.notification_payload(request_id or None)
         cleanup_ok = cleanup_broad_rule()
         STATE.set_phase(request_id, RequestPhase.CLOSED if cleanup_ok else RequestPhase.FAILED)
+        if not cleanup_ok:
+            if notification is None:
+                self.send_cleanup_critical_alert_best_effort(uid, None, "close_request")
+            else:
+                self.send_cleanup_critical_alert_best_effort_from_snapshot(notification, "close_request", request_id)
         STATE.clear(request_id or None)
         append_jsonl(DAEMON_LOG, "window_closed", {"request_id": request_id, "cleanup_ok": cleanup_ok})
         return {"ok": cleanup_ok, "status": "closed" if cleanup_ok else "cleanup_failed"}
@@ -283,27 +301,92 @@ class RequestHandler(socketserver.StreamRequestHandler):
                     {"request_id": payload.get("request_id"), "status": "FAILED", "error": str(exc), "request_error": error},
                 )
 
+    def send_cleanup_critical_alert_best_effort_from_snapshot(
+        self,
+        notification: tuple[int, dict[str, Any]] | None,
+        source: str,
+        request_id: str,
+    ) -> None:
+        if notification is None:
+            append_jsonl(
+                DAEMON_LOG,
+                "cleanup_critical_alert_skipped",
+                {"request_id": request_id or None, "source": source, "reason": "no_active_request"},
+            )
+            return
+        uid, payload = notification
+        self.send_cleanup_critical_alert_best_effort(uid, payload, source)
+
+    def send_cleanup_critical_alert_best_effort(self, uid: int, payload: dict[str, Any] | None, source: str) -> None:
+        request_id = payload.get("request_id") if payload is not None else None
+        try:
+            home = home_for_uid(uid)
+            cfg = load_config(home)
+            telegram = TelegramClient(read_token(cfg.telegram_bot_token_file))
+            if not cfg.telegram_allowed_user_ids:
+                raise ValueError("telegram_allowed_user_ids is empty")
+        except Exception as exc:
+            append_jsonl(
+                DAEMON_LOG,
+                "cleanup_critical_alert_failed",
+                {"request_id": request_id, "source": source, "error": str(exc)},
+            )
+            return
+
+        for chat_id in cfg.telegram_allowed_user_ids:
+            try:
+                message_id = telegram.send_cleanup_critical_alert(int(chat_id), payload, source, str(DROPIN_PATH))
+                append_jsonl(
+                    DAEMON_LOG,
+                    "cleanup_critical_alert_sent",
+                    {"request_id": request_id, "source": source, "chat_id": int(chat_id), "message_id": message_id},
+                )
+            except Exception as exc:
+                append_jsonl(
+                    DAEMON_LOG,
+                    "cleanup_critical_alert_failed",
+                    {"request_id": request_id, "source": source, "chat_id": int(chat_id), "error": str(exc)},
+                )
+
     def handle_status(self) -> dict[str, Any]:
         return {"ok": True, "status": "ok", **STATE.status(), "dropin_exists": DROPIN_PATH.exists()}
 
     def handle_cancel(self, message: dict[str, Any]) -> dict[str, Any]:
+        uid = peer_uid(self.request)
         request_id = str(message.get("request_id") or "")
+        notification = STATE.notification_payload(request_id or None)
         cleanup_ok = cleanup_broad_rule()
         STATE.set_phase(request_id, RequestPhase.CANCELLED if cleanup_ok else RequestPhase.FAILED)
+        if not cleanup_ok:
+            if notification is None:
+                self.send_cleanup_critical_alert_best_effort(uid, None, "cancel")
+            else:
+                self.send_cleanup_critical_alert_best_effort_from_snapshot(notification, "cancel", request_id)
         STATE.clear(request_id or None)
         append_jsonl(DAEMON_LOG, "request_cancelled", {"request_id": request_id, "cleanup_ok": cleanup_ok})
         return {"ok": cleanup_ok, "status": "cancelled" if cleanup_ok else "cleanup_failed"}
 
     def handle_cleanup(self) -> dict[str, Any]:
+        uid = peer_uid(self.request)
+        notification = STATE.notification_payload()
         cleanup_ok = cleanup_broad_rule()
+        if not cleanup_ok:
+            if notification is None:
+                self.send_cleanup_critical_alert_best_effort(uid, None, "cleanup")
+            else:
+                self.send_cleanup_critical_alert_best_effort_from_snapshot(notification, "cleanup", "")
         STATE.clear(None)
         append_jsonl(DAEMON_LOG, "cleanup", {"cleanup_ok": cleanup_ok})
         return {"ok": cleanup_ok, "status": "clean" if cleanup_ok else "cleanup_failed"}
 
 
 def watchdog_cleanup(request_id: str) -> None:
+    notification = STATE.notification_payload(request_id)
     cleanup_ok = cleanup_broad_rule(retries=10, delay_seconds=0.5)
     STATE.set_phase(request_id, RequestPhase.EXPIRED if cleanup_ok else RequestPhase.FAILED)
+    if not cleanup_ok:
+        handler = RequestHandler.__new__(RequestHandler)
+        handler.send_cleanup_critical_alert_best_effort_from_snapshot(notification, "watchdog", request_id)
     STATE.clear(request_id)
     append_jsonl(DAEMON_LOG, "window_watchdog_cleanup", {"request_id": request_id, "cleanup_ok": cleanup_ok})
 

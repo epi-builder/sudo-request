@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from sudo_request.lib.approval.decision import approval_callback_data
-from sudo_request.lib.approval.message import approval_message_text, format_local_timestamp
+from sudo_request.lib.approval.message import approval_message_text, cleanup_critical_message_text, format_local_timestamp
 from sudo_request.lib.approval.telegram import TelegramClient
 
 
@@ -48,6 +48,19 @@ class TelegramTests(unittest.TestCase):
         self.assertIn("(1)", approval_message_text(self.payload(), "APPROVED"))
         self.assertIn("Broad mode opens passwordless sudo", approval_message_text(self.payload(), "APPROVED"))
 
+    def test_cleanup_critical_message_includes_residual_rule_warning(self) -> None:
+        text = cleanup_critical_message_text(self.payload(), "watchdog", "/private/etc/sudoers.d/sudo-request-broad")
+        self.assertIn("[CRITICAL cleanup_failed]", text)
+        self.assertIn("Source:  watchdog", text)
+        self.assertIn("Drop-in: /private/etc/sudoers.d/sudo-request-broad", text)
+        self.assertIn("broad sudo rule may still be installed", text)
+        self.assertIn("Passwordless sudo may remain available", text)
+
+    def test_cleanup_critical_message_handles_missing_request_payload(self) -> None:
+        text = cleanup_critical_message_text(None, "cleanup", "/private/etc/sudoers.d/sudo-request-broad")
+        self.assertIn("[CRITICAL cleanup_failed]", text)
+        self.assertIn("Active request details are unavailable", text)
+
     def test_format_local_timestamp_keeps_epoch_for_auditability(self) -> None:
         formatted = format_local_timestamp(1)
         self.assertRegex(formatted, r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} .+ \+\d{4} \(1\)")
@@ -69,6 +82,23 @@ class TelegramTests(unittest.TestCase):
         self.assertEqual(calls[0][1]["message_id"], 456)
         self.assertIn("[DENIED]", calls[0][1]["text"])
         self.assertEqual(calls[0][1]["reply_markup"], {"inline_keyboard": []})
+
+    def test_send_cleanup_critical_alert_sends_plain_message(self) -> None:
+        calls = []
+
+        def fake_post(method, body, timeout=30):
+            calls.append((method, body, timeout))
+            return {"message_id": 99}
+
+        client = TelegramClient("token")
+        with patch.object(client, "_post", side_effect=fake_post):
+            message_id = client.send_cleanup_critical_alert(123, self.payload(), "close_request", "/dropin")
+
+        self.assertEqual(message_id, 99)
+        self.assertEqual(calls[0][0], "sendMessage")
+        self.assertEqual(calls[0][1]["chat_id"], 123)
+        self.assertIn("[CRITICAL cleanup_failed]", calls[0][1]["text"])
+        self.assertEqual(calls[0][2], 10)
 
     def test_mark_status_raises_when_telegram_edit_fails(self) -> None:
         client = TelegramClient("token")
