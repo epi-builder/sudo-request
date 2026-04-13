@@ -24,9 +24,11 @@ class RequestLifecycle:
     payload_hash: str
     uid: int
     user: str
+    host: str
     argv: list[str]
     cwd: str
     resolved_executable: str
+    parent_process: dict[str, Any]
     expires_at: int
     requested_window_seconds: int
     max_window_seconds: int
@@ -41,9 +43,11 @@ class RequestLifecycle:
             payload_hash=str(payload["payload_hash"]),
             uid=int(payload["uid"]),
             user=str(payload["user"]),
+            host=str(payload["host"]),
             argv=list(payload["argv"]),
             cwd=str(payload["cwd"]),
             resolved_executable=str(payload["resolved_executable"]),
+            parent_process=dict(payload["parent_process"]),
             expires_at=int(payload["expires_at"]),
             requested_window_seconds=int(payload["requested_window_seconds"]),
             max_window_seconds=int(payload["max_window_seconds"]),
@@ -57,12 +61,31 @@ class RequestLifecycle:
             "phase": self.phase.value,
             "uid": self.uid,
             "user": self.user,
+            "host": self.host,
             "argv": self.argv,
             "cwd": self.cwd,
             "resolved_executable": self.resolved_executable,
+            "parent_process": self.parent_process,
             "expires_at": self.expires_at,
             "requested_window_seconds": self.requested_window_seconds,
             "max_window_seconds": self.max_window_seconds,
             "approval_messages": self.approval_messages,
             "exit_code": self.exit_code,
+        }
+
+    def to_approval_payload(self) -> dict[str, Any]:
+        return {
+            "request_id": self.request_id,
+            "payload_hash": self.payload_hash,
+            "uid": self.uid,
+            "user": self.user,
+            "host": self.host,
+            "argv": self.argv,
+            "cwd": self.cwd,
+            "resolved_executable": self.resolved_executable,
+            "parent_process": self.parent_process,
+            "expires_at": self.expires_at,
+            "requested_window_seconds": self.requested_window_seconds,
+            "max_window_seconds": self.max_window_seconds,
+            "approval_messages": self.approval_messages,
         }

@@ -1,7 +1,10 @@
 개선사항들:
 - [x] approval 이후 실제 command 실행 시작 시 `sudo-request: running command...` 메시지 출력
 - [x] command 종료 시 `sudo-request: command exited with code N` 메시지 출력
-- [ ] Telegram 메시지를 승인 이후 `[RUNNING]`, 종료 후 `[DONE exit=N]` 상태로 업데이트
+- [x] Telegram 메시지를 승인 이후 `[RUNNING]`, 종료 후 `[DONE exit=N]` 상태로 업데이트
+- [ ] Telegram approval 대기 중 daemon 오류가 나면 기존 요청 메시지를 `[FAILED]`로 best-effort 업데이트
+  Telegram 메시지 발송 후 `No route to host` 같은 오류가 나면 daemon/CLI 요청은 종료되지만 메시지는 `[PENDING]`으로 남을 수 있다.
+  업데이트가 실패하면 `telegram_status_update_failed` 같은 daemon audit log에 request id, target status, error를 남긴다.
 - [ ] cleanup 실패 또는 broad sudo rule 잔존 시 Telegram critical 알림 전송
 - [ ] `sudo-request status`에 active command, phase, window expires_at local time, daemon pid 등 실시간 상태 확장
 - [ ] `sudo-request doctor`에 socket/drop-in/launchd 파일 owner/mode 권한 검사 추가

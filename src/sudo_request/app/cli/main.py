@@ -120,16 +120,21 @@ def command_run(cmd: list[str], window_seconds: int | None = None) -> int:
         return int(response.get("exit_code", EXIT_DAEMON_FAILURE))
 
     request_id = str(response["request_id"])
+    payload_hash = str(response["payload_hash"])
     print(f"sudo-request: approved; broad sudo window open for up to {response.get('window_seconds')}s", file=sys.stderr)
     append_jsonl_best_effort(user_audit_path(Path.home()), "command_started", {"request_id": request_id, "argv": cmd})
     print("sudo-request: running command...", file=sys.stderr)
+    send_lifecycle_event_best_effort(request_id, payload_hash, "running")
     returncode = EXIT_DAEMON_FAILURE
+    command_completed = False
     try:
         proc = subprocess.run(cmd)
         returncode = int(proc.returncode)
+        command_completed = True
         return returncode
     finally:
         print(f"sudo-request: command exited with code {returncode}", file=sys.stderr)
+        send_lifecycle_event_best_effort(request_id, payload_hash, "done" if command_completed else "failed", returncode)
         close_request_with_diagnostics(request_id, ipc_request)
         subprocess.run(["/usr/bin/sudo", "-k"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         append_jsonl_best_effort(user_audit_path(Path.home()), "command_finished", {"request_id": request_id, "exit_code": returncode})
@@ -140,6 +145,21 @@ def ipc_request(message: dict[str, Any]) -> dict[str, Any]:
         sock.connect(str(SOCKET_PATH))
         send_json_line(sock, message)
         return recv_json_line(sock.makefile("r", encoding="utf-8"))
+
+
+def send_lifecycle_event_best_effort(request_id: str, payload_hash: str, phase: str, exit_code: int | None = None) -> None:
+    message: dict[str, Any] = {
+        "type": "lifecycle_event",
+        "request_id": request_id,
+        "payload_hash": payload_hash,
+        "phase": phase,
+    }
+    if exit_code is not None:
+        message["exit_code"] = exit_code
+    try:
+        ipc_request(message)
+    except Exception:
+        return
 
 
 def ipc_request_with_heartbeat(message: dict[str, Any], cfg: Config) -> dict[str, Any]:

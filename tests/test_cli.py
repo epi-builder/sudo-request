@@ -17,7 +17,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(command_run(["/bin/echo", "ok"], 0), 125)
 
     def test_command_run_prints_running_and_exit_status(self) -> None:
-        response = {"ok": True, "request_id": "req-1", "window_seconds": 5}
+        response = {"ok": True, "request_id": "req-1", "payload_hash": "hash-1", "window_seconds": 5}
         calls = []
 
         def fake_run(cmd, stdout=None, stderr=None):
@@ -30,14 +30,17 @@ class CliTests(unittest.TestCase):
             with patch("sudo_request.app.cli.main.ipc_request_with_heartbeat", return_value=response):
                 with patch("sudo_request.app.cli.main.close_request_with_diagnostics"):
                     with patch("sudo_request.app.cli.main.append_jsonl_best_effort"):
-                        with patch("sudo_request.app.cli.main.subprocess.run", side_effect=fake_run):
-                            with redirect_stderr(StringIO()) as stderr:
-                                self.assertEqual(command_run(["/bin/false"], 3), 7)
+                        with patch("sudo_request.app.cli.main.send_lifecycle_event_best_effort") as lifecycle:
+                            with patch("sudo_request.app.cli.main.subprocess.run", side_effect=fake_run):
+                                with redirect_stderr(StringIO()) as stderr:
+                                    self.assertEqual(command_run(["/bin/false"], 3), 7)
 
         self.assertIn(["/usr/bin/sudo", "-k"], calls)
         self.assertIn(["/bin/false"], calls)
         self.assertIn("sudo-request: running command...", stderr.getvalue())
         self.assertIn("sudo-request: command exited with code 7", stderr.getvalue())
+        self.assertEqual(lifecycle.call_args_list[0].args, ("req-1", "hash-1", "running"))
+        self.assertEqual(lifecycle.call_args_list[1].args, ("req-1", "hash-1", "done", 7))
 
     def test_command_update_itself_wraps_install_command(self) -> None:
         with patch("sudo_request.app.cli.main.update_itself_command", return_value=["/usr/bin/sudo", "/usr/bin/python3", "-m", "sudo_request", "install"]):

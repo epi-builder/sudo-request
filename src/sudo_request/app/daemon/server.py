@@ -123,6 +123,8 @@ class RequestHandler(socketserver.StreamRequestHandler):
             return self.handle_run_request(message)
         if kind == "close_request":
             return self.handle_close_request(message)
+        if kind == "lifecycle_event":
+            return self.handle_lifecycle_event(message)
         if kind == "status":
             return self.handle_status()
         if kind == "cancel":
@@ -212,6 +214,55 @@ class RequestHandler(socketserver.StreamRequestHandler):
         STATE.clear(request_id or None)
         append_jsonl(DAEMON_LOG, "window_closed", {"request_id": request_id, "cleanup_ok": cleanup_ok})
         return {"ok": cleanup_ok, "status": "closed" if cleanup_ok else "cleanup_failed"}
+
+    def handle_lifecycle_event(self, message: dict[str, Any]) -> dict[str, Any]:
+        uid = peer_uid(self.request)
+        request_id = str(message.get("request_id") or "")
+        payload_hash_value = str(message.get("payload_hash") or "")
+        phase_value = str(message.get("phase") or "")
+        exit_code = message.get("exit_code")
+        with STATE.lock:
+            request = STATE.active_request
+            if request is None:
+                return {"ok": False, "status": "not_active", "exit_code": 125, "error": "no active request"}
+            if request.request_id != request_id or request.payload_hash != payload_hash_value or request.uid != uid:
+                return {"ok": False, "status": "request_mismatch", "exit_code": 125, "error": "lifecycle event does not match active request"}
+        if phase_value == "running":
+            phase = RequestPhase.RUNNING
+            telegram_status = "RUNNING"
+            exit_code_int = None
+        elif phase_value == "done":
+            phase = RequestPhase.DONE
+            exit_code_int = int(exit_code)
+            telegram_status = f"DONE exit={exit_code_int}"
+        elif phase_value == "failed":
+            phase = RequestPhase.FAILED
+            exit_code_int = int(exit_code) if exit_code is not None else None
+            telegram_status = "FAILED" if exit_code_int is None else f"FAILED exit={exit_code_int}"
+        else:
+            return {"ok": False, "status": "bad_request", "exit_code": 125, "error": f"unknown lifecycle phase: {phase_value}"}
+
+        STATE.set_phase(request_id, phase, exit_code_int)
+        with STATE.lock:
+            request = STATE.active_request
+            payload = request.to_approval_payload() if request is not None else None
+        if payload is not None:
+            self.mark_approval_messages(uid, payload, telegram_status)
+        append_jsonl(DAEMON_LOG, "lifecycle_event", {"request_id": request_id, "phase": phase.value, "exit_code": exit_code_int})
+        return {"ok": True, "status": "updated"}
+
+    def mark_approval_messages(self, uid: int, payload: dict[str, Any], status: str) -> None:
+        try:
+            home = home_for_uid(uid)
+            cfg = load_config(home)
+            telegram = TelegramClient(read_token(cfg.telegram_bot_token_file))
+            for message in payload.get("approval_messages", []):
+                chat_id = message.get("chat_id")
+                message_id = message.get("message_id")
+                if chat_id is not None and message_id is not None:
+                    telegram.mark_status(int(chat_id), int(message_id), payload, status)
+        except Exception as exc:
+            append_jsonl(DAEMON_LOG, "telegram_status_update_failed", {"request_id": payload.get("request_id"), "status": status, "error": str(exc)})
 
     def handle_status(self) -> dict[str, Any]:
         return {"ok": True, "status": "ok", **STATE.status(), "dropin_exists": DROPIN_PATH.exists()}
