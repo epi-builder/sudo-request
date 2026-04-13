@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 
 from sudo_request.app.daemon import server
 from sudo_request.app.daemon.lifecycle import RequestLifecycle, RequestPhase
-from sudo_request.app.daemon.server import DaemonState, peer_uid
+from sudo_request.app.daemon.server import DaemonState
 from sudo_request.lib.config import Config
 
 
@@ -236,13 +236,6 @@ class DaemonStateTests(unittest.TestCase):
         alert.assert_called_once()
         self.assertEqual(alert.call_args.args[1], "watchdog")
         self.assertIsNone(state.active_request)
-
-    def test_peer_uid_uses_darwin_local_peercred_fallback(self) -> None:
-        sock = Mock()
-        del sock.getpeereid
-        sock.getsockopt.return_value = b"\x00\x00\x00\x00\xf5\x01\x00\x00\x01\x00"
-        self.assertEqual(peer_uid(sock), 501)
-
 
 if __name__ == "__main__":
     unittest.main()

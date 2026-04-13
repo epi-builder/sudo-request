@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 import os
-import pwd
 import signal
-import socket
 import socketserver
-import struct
 import threading
 import time
 from pathlib import Path
 from typing import Any
 
 from sudo_request.app.daemon.lifecycle import RequestLifecycle, RequestPhase
+from sudo_request.app.daemon.peer import home_for_uid, peer_uid, user_for_uid
 from sudo_request.lib.audit import append_jsonl
 from sudo_request.lib.approval.telegram import TelegramClient
 from sudo_request.lib.config import load_config, read_token
@@ -101,26 +99,6 @@ class DaemonState:
 
 
 STATE = DaemonState()
-
-
-def peer_uid(sock: socket.socket) -> int:
-    if hasattr(sock, "getpeereid"):
-        uid, _gid = sock.getpeereid()
-        return int(uid)
-    if hasattr(socket, "LOCAL_PEERCRED"):
-        raw = sock.getsockopt(0, socket.LOCAL_PEERCRED, 256)
-        if len(raw) >= struct.calcsize("IIh"):
-            _version, uid, _ngroups = struct.unpack_from("IIh", raw)
-            return int(uid)
-    raise RuntimeError("getpeereid is required on this platform")
-
-
-def home_for_uid(uid: int) -> Path:
-    return Path(pwd.getpwuid(uid).pw_dir)
-
-
-def user_for_uid(uid: int) -> str:
-    return pwd.getpwuid(uid).pw_name
 
 
 class RequestHandler(socketserver.StreamRequestHandler):
