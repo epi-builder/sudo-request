@@ -75,6 +75,9 @@ request. If cleanup already happened, this is reported as:
 sudo-request: cleanup request could not reach daemon, but broad sudo rule is not installed
 ```
 
+See [docs/operations.md](docs/operations.md) for the detailed update flow,
+post-update verification, and sudo-request command patterns.
+
 Uninstall:
 
 ```bash
@@ -108,43 +111,8 @@ uv run python -m unittest discover -s tests
 scripts/e2e-smoke.sh
 ```
 
-Request a custom window within the configured max:
+Detailed project-maintenance docs live under [docs/](docs/):
 
-```bash
-sudo-request run --window-seconds 120 -- /usr/bin/sudo /usr/bin/id -u
-```
-
-Run the root/Telegram manual e2e after installing the daemon:
-
-```bash
-scripts/e2e-root-manual.sh
-```
-
-By default, the manual e2e uses the source checkout CLI through
-`uv run sudo-request`. To test the installed PATH wrapper instead:
-
-```bash
-SUDO_REQUEST_BIN=sudo-request scripts/e2e-root-manual.sh
-```
-
-The manual e2e asks for Telegram approval, verifies `/usr/bin/sudo /usr/bin/id -u`
-returns `0` during the approved run, and verifies passwordless sudo is closed
-after cleanup.
-
-## Project Layout
-
-```text
-src/sudo_request/
-  app/
-    cli/       user-level CLI entrypoint and command flow
-    daemon/    root-level IPC server and broad window lifecycle
-  lib/
-    approval/  Telegram approval client, decision, and message formatting
-    security/  payload hashing, command validation, sudoers drop-in handling
-    config.py  user config loading
-    ipc.py     JSON-line Unix socket helpers
-    audit.py   JSONL audit log helpers
-```
-
-Tests follow the same responsibility split with `test_app_*`,
-`test_approval_*`, and `test_security_*` files.
+- [docs/architecture.md](docs/architecture.md)
+- [docs/development.md](docs/development.md)
+- [docs/operations.md](docs/operations.md)
