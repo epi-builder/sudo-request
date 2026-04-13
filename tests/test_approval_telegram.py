@@ -34,7 +34,7 @@ class TelegramTests(unittest.TestCase):
 
         client = TelegramClient("token")
         with patch.object(client, "_post", side_effect=fake_post):
-            client.send_approval(123, payload)
+            client.send_approval_request(123, payload)
         buttons = captured["reply_markup"]["inline_keyboard"][0]
         self.assertLessEqual(len(buttons[0]["callback_data"].encode("utf-8")), 64)
         self.assertLessEqual(len(buttons[1]["callback_data"].encode("utf-8")), 64)
@@ -50,7 +50,7 @@ class TelegramTests(unittest.TestCase):
         self.assertRegex(formatted, r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} .+ \+\d{4} \(1\)")
         self.assertIn("(1)", formatted)
 
-    def test_mark_decision_edits_message_and_removes_buttons(self) -> None:
+    def test_mark_callback_status_edits_message_and_removes_buttons(self) -> None:
         calls = []
 
         def fake_post(method, body, timeout=30):
@@ -60,14 +60,14 @@ class TelegramTests(unittest.TestCase):
         callback = {"message": {"chat": {"id": 123}, "message_id": 456}}
         client = TelegramClient("token")
         with patch.object(client, "_post", side_effect=fake_post):
-            client.mark_decision(callback, self.payload(), "DENIED")
+            client.mark_callback_status(callback, self.payload(), "DENIED")
         self.assertEqual(calls[0][0], "editMessageText")
         self.assertEqual(calls[0][1]["chat_id"], 123)
         self.assertEqual(calls[0][1]["message_id"], 456)
         self.assertIn("[DENIED]", calls[0][1]["text"])
         self.assertEqual(calls[0][1]["reply_markup"], {"inline_keyboard": []})
 
-    def test_wait_for_decision_marks_timeout_expired(self) -> None:
+    def test_wait_for_approval_decision_marks_timeout_expired(self) -> None:
         payload = self.payload()
         payload["approval_messages"] = [{"chat_id": 123, "message_id": 456}]
         calls = []
@@ -78,7 +78,7 @@ class TelegramTests(unittest.TestCase):
 
         client = TelegramClient("token")
         with patch.object(client, "_post", side_effect=fake_post):
-            result = client.wait_for_decision(payload, [1], 0)
+            result = client.wait_for_approval_decision(payload, [1], 0)
         self.assertEqual(result.status, "timeout")
         self.assertEqual(result.message, "request expired by timeout")
         self.assertEqual(calls[0][0], "editMessageText")

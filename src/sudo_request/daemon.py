@@ -133,11 +133,11 @@ class RequestHandler(socketserver.StreamRequestHandler):
             telegram = TelegramClient(token)
             approval_messages = []
             for chat_id in cfg.telegram_allowed_user_ids:
-                message_id = telegram.send_approval(chat_id, payload)
+                message_id = telegram.send_approval_request(chat_id, payload)
                 approval_messages.append({"chat_id": chat_id, "message_id": message_id})
             payload["approval_messages"] = approval_messages
             payload["payload_hash"] = payload_hash({k: v for k, v in payload.items() if k not in {"payload_hash", "approval_messages"}})
-            decision = telegram.wait_for_decision(payload, cfg.telegram_allowed_user_ids, cfg.approval_timeout_seconds)
+            decision = telegram.wait_for_approval_decision(payload, cfg.telegram_allowed_user_ids, cfg.approval_timeout_seconds)
             append_jsonl(DAEMON_LOG, "approval_decision", {"request_id": request_id, "status": decision.status, "approver_id": decision.approver_id})
 
             if decision.status == "timeout":

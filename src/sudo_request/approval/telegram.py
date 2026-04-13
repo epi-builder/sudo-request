@@ -40,7 +40,7 @@ class TelegramClient:
             raise RuntimeError(f"Telegram {method} failed: {raw}")
         return raw
 
-    def send_approval(self, chat_id: int, payload: dict[str, Any]) -> int:
+    def send_approval_request(self, chat_id: int, payload: dict[str, Any]) -> int:
         text = approval_message_text(payload, "PENDING")
         nonce = payload["nonce"]
         request_id = payload["request_id"]
@@ -59,16 +59,16 @@ class TelegramClient:
     def answer_callback(self, callback_id: str, text: str) -> None:
         self._post("answerCallbackQuery", {"callback_query_id": callback_id, "text": text}, timeout=10)
 
-    def mark_decision(self, callback: dict[str, Any], payload: dict[str, Any], status: str) -> None:
+    def mark_callback_status(self, callback: dict[str, Any], payload: dict[str, Any], status: str) -> None:
         message = callback.get("message") or {}
         chat = message.get("chat") or {}
         chat_id = chat.get("id")
         message_id = message.get("message_id")
         if chat_id is None or message_id is None:
             return
-        self.mark_message(int(chat_id), int(message_id), payload, status)
+        self.mark_status(int(chat_id), int(message_id), payload, status)
 
-    def mark_message(self, chat_id: int, message_id: int, payload: dict[str, Any], status: str) -> None:
+    def mark_status(self, chat_id: int, message_id: int, payload: dict[str, Any], status: str) -> None:
         try:
             self._post(
                 "editMessageText",
@@ -78,7 +78,7 @@ class TelegramClient:
         except Exception:
             return
 
-    def wait_for_decision(self, payload: dict[str, Any], allowed_user_ids: list[int], timeout_seconds: int) -> ApprovalResult:
+    def wait_for_approval_decision(self, payload: dict[str, Any], allowed_user_ids: list[int], timeout_seconds: int) -> ApprovalResult:
         deadline = time.time() + timeout_seconds
         offset = 0
         expected_request_id = payload["request_id"]
@@ -107,17 +107,17 @@ class TelegramClient:
                     continue
                 if action == "a":
                     self.answer_callback(str(callback["id"]), "Approved")
-                    self.mark_decision(callback, payload, "APPROVED")
+                    self.mark_callback_status(callback, payload, "APPROVED")
                     return ApprovalResult("approved", user_id)
                 if action == "d":
                     self.answer_callback(str(callback["id"]), "Denied")
-                    self.mark_decision(callback, payload, "DENIED")
+                    self.mark_callback_status(callback, payload, "DENIED")
                     return ApprovalResult("denied", user_id)
         for message in payload.get("approval_messages", []):
             chat_id = message.get("chat_id")
             message_id = message.get("message_id")
             if chat_id is not None and message_id is not None:
-                self.mark_message(int(chat_id), int(message_id), payload, "EXPIRED")
+                self.mark_status(int(chat_id), int(message_id), payload, "EXPIRED")
         return ApprovalResult("timeout", None, "request expired by timeout")
 
 
