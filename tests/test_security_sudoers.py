@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from sudo_request.sudoers import render_broad_rule
+from sudo_request.security.sudoers import render_broad_rule
 
 
 class SudoersTests(unittest.TestCase):

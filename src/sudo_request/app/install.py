@@ -7,15 +7,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .constants import BIN_PATH, EXIT_DAEMON_FAILURE, INSTALL_PREFIX, LAUNCHD_PLIST
-from .sudoers import cleanup_broad_rule
+from ..constants import BIN_PATH, EXIT_DAEMON_FAILURE, INSTALL_PREFIX, LAUNCHD_PLIST
+from ..security.sudoers import cleanup_broad_rule
 
 
 def install_tool() -> int:
     if os.geteuid() != 0:
         print("install must be run with sudo/root", file=sys.stderr)
         return EXIT_DAEMON_FAILURE
-    source_root = Path(__file__).resolve().parents[2]
+    source_root = project_root()
     if INSTALL_PREFIX.exists():
         shutil.rmtree(INSTALL_PREFIX)
     shutil.copytree(
@@ -46,6 +46,10 @@ def install_tool() -> int:
     print(f"installed PATH wrapper: {BIN_PATH}")
     print("ensure /usr/local/bin is in PATH, then use: sudo-request run -- <command>")
     return 0
+
+
+def project_root() -> Path:
+    return Path(__file__).resolve().parents[3]
 
 
 def install_daemon(executable: Path | None = None) -> int:

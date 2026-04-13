@@ -6,7 +6,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from .constants import DROPIN_DIR, DROPIN_PATH
+from ..constants import DROPIN_DIR, DROPIN_PATH
 from .payload import validate_username
 
 

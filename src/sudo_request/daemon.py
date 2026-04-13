@@ -15,9 +15,9 @@ from .audit import append_jsonl
 from .config import load_config, read_token
 from .constants import DAEMON_LOG, DROPIN_PATH, EXIT_DAEMON_FAILURE, SOCKET_DIR, SOCKET_PATH
 from .ipc import recv_json_line, send_json_line
-from .payload import build_payload, payload_hash, validate_username
-from .sudoers import cleanup_broad_rule, install_broad_rule
-from .telegram import TelegramClient
+from .approval.telegram import TelegramClient
+from .security.payload import build_payload, payload_hash, validate_username
+from .security.sudoers import cleanup_broad_rule, install_broad_rule
 
 
 class DaemonState:

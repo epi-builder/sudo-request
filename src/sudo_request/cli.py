@@ -12,13 +12,13 @@ from pathlib import Path
 from typing import Any
 
 from .audit import append_jsonl_best_effort, user_audit_path
-from .cleanup import close_request_with_diagnostics
+from .app.cleanup import close_request_with_diagnostics
 from .config import Config, config_path, load_config
 from .constants import BIN_PATH, EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK, INSTALL_PREFIX, LAUNCHD_PLIST, SOCKET_PATH
 from .daemon import run_foreground
-from .install import install_daemon, install_tool, uninstall_daemon, uninstall_tool
+from .app.install import install_daemon, install_tool, uninstall_daemon, uninstall_tool
 from .ipc import recv_json_line, send_json_line
-from .sudoers import cleanup_broad_rule
+from .security.sudoers import cleanup_broad_rule
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -181,4 +181,3 @@ def command_doctor() -> int:
     except Exception as exc:
         print(f"daemon status: unavailable: {exc}")
     return 0
-

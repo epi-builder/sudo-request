@@ -6,7 +6,7 @@ from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from sudo_request.cleanup import close_request_with_diagnostics
+from sudo_request.app.cleanup import close_request_with_diagnostics
 
 
 class CleanupTests(unittest.TestCase):
