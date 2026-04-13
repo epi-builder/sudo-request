@@ -1,0 +1,26 @@
+개선사항들:
+- [ ] approval 이후 실제 command 실행 시작 시 `sudo-request: running command...` 메시지 출력
+- [ ] command 종료 시 `sudo-request: command exited with code N` 메시지 출력
+- [ ] Telegram 메시지를 승인 이후 `[RUNNING]`, 종료 후 `[DONE exit=N]` 상태로 업데이트
+- [ ] cleanup 실패 또는 broad sudo rule 잔존 시 Telegram critical 알림 전송
+- [ ] `sudo-request status`에 active command, phase, window expires_at local time, daemon pid 등 실시간 상태 확장
+- [ ] `sudo-request doctor`에 socket/drop-in/launchd 파일 owner/mode 권한 검사 추가
+- [ ] long-running command 실행 중 선택적 heartbeat 출력 지원
+- [ ] timeout/deny/daemon failure stderr 메시지 포맷을 agent가 읽기 쉽도록 더 일관화
+- [ ] 긴 `--window-seconds` 요청이 max에 가까울 때 Telegram 승인 메시지에 추가 경고 표시
+- [ ] self-management/install 명령처럼 `/usr/bin/sudo ... sudo-request install` 형태의 요청을 Telegram에서 더 명확히 표시
+
+리팩토링:
+- [ ] Telegram 상태 업데이트 API를 `send approval`, `mark status`, `wait decision` 책임으로 더 명시적으로 정리
+- [ ] approval message formatting을 `approval/message.py` 같은 별도 모듈로 분리
+- [ ] Telegram callback 검증과 approval decision 모델을 `approval/decision.py`로 분리
+- [ ] request lifecycle 모델을 dataclass로 정리
+- [ ] `DaemonState`를 active_request_id 중심에서 phase/command/expires_at을 담는 state object 중심으로 정리
+- [ ] daemon peer uid 조회 로직을 `daemon/peer.py`로 분리
+- [ ] daemon watchdog/TTL cleanup 로직을 `daemon/watchdog.py`로 분리
+- [ ] daemon request dispatch/server 코드를 패키지화하되, `daemon.py` 파일명 충돌을 피하는 방식으로 단계적 이동
+- [ ] CLI 출력 메시지를 `output.py` 또는 app output helper로 분리
+- [ ] `doctor` 구현을 `app/doctor.py`로 분리
+- [ ] `run` command flow를 `app/run.py`로 분리
+- [ ] `status`, `cancel`, `cleanup` IPC command wrappers를 `app/status.py` 또는 `app/ipc_commands.py`로 분리
+- [ ] 테스트 공통 fixture/helper를 `tests/helpers.py`로 분리
