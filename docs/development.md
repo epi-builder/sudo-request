@@ -50,7 +50,7 @@ scripts/e2e-smoke.sh
 For install/update, daemon, sudoers, or IPC behavior changes:
 
 ```bash
-sudo-request update-itself --source /Users/epikem/dev/tmp/codex-test/sudo-request
+sudo-request update-itself --source <absolute_path_to_sudo-request_checkout>
 SUDO_REQUEST_BIN=sudo-request scripts/e2e-root-manual.sh
 ```
 

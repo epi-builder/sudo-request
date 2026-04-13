@@ -65,7 +65,7 @@ If running from the installed command instead of the source checkout, pass the
 checkout explicitly:
 
 ```bash
-sudo-request update-itself --source /Users/epikem/dev/tmp/codex-test/sudo-request
+sudo-request update-itself --source <absolute_path_to_sudo-request_checkout>
 ```
 
 During reinstall the daemon may restart before the CLI can send its final close

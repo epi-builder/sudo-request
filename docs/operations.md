@@ -15,7 +15,7 @@ After the tool is installed, prefer approval-based self-update instead of direct
 sudo install:
 
 ```bash
-sudo-request update-itself --source /Users/epikem/dev/tmp/codex-test/sudo-request
+sudo-request update-itself --source <absolute_path_to_sudo-request_checkout>
 ```
 
 When running `update-itself` from the source checkout, this also works:
