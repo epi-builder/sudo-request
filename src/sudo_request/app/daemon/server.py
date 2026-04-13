@@ -3,99 +3,20 @@ from __future__ import annotations
 import os
 import signal
 import socketserver
-import threading
-import time
 from pathlib import Path
 from typing import Any
 
 from sudo_request.app.daemon.lifecycle import RequestLifecycle, RequestPhase
 from sudo_request.app.daemon.peer import home_for_uid, peer_uid, user_for_uid
+from sudo_request.app.daemon.state import DaemonState
+from sudo_request.app.daemon.sudo_window import broad_window_exists, close_broad_window, open_broad_window
+from sudo_request.app.daemon.watchdog import schedule_watchdog
 from sudo_request.lib.audit import append_jsonl
 from sudo_request.lib.approval.telegram import TelegramClient
 from sudo_request.lib.config import load_config, read_token
 from sudo_request.lib.constants import DAEMON_LOG, DROPIN_PATH, EXIT_DAEMON_FAILURE, SOCKET_DIR, SOCKET_PATH
 from sudo_request.lib.ipc import recv_json_line, send_json_line
 from sudo_request.lib.security.payload import build_payload, payload_hash, validate_username
-from sudo_request.lib.security.sudoers import cleanup_broad_rule, install_broad_rule
-
-
-class DaemonState:
-    def __init__(self) -> None:
-        self.lock = threading.Lock()
-        self.active_request: RequestLifecycle | None = None
-        self.cleanup_timer: threading.Timer | None = None
-
-    @property
-    def active_request_id(self) -> str | None:
-        return self.active_request.request_id if self.active_request is not None else None
-
-    @property
-    def active_user(self) -> str | None:
-        return self.active_request.user if self.active_request is not None else None
-
-    def begin(self, request: RequestLifecycle) -> bool:
-        with self.lock:
-            if self.active_request is not None:
-                return False
-            self.active_request = request
-            return True
-
-    def set_phase(self, request_id: str, phase: RequestPhase, exit_code: int | None = None) -> bool:
-        with self.lock:
-            if self.active_request is None or self.active_request.request_id != request_id:
-                return False
-            self.active_request.phase = phase
-            if exit_code is not None:
-                self.active_request.exit_code = exit_code
-            return True
-
-    def set_window_expires_at(self, request_id: str, window_expires_at: int) -> bool:
-        with self.lock:
-            if self.active_request is None or self.active_request.request_id != request_id:
-                return False
-            self.active_request.window_expires_at = window_expires_at
-            return True
-
-    def set_approval_messages(self, request_id: str, approval_messages: list[dict[str, int]]) -> bool:
-        with self.lock:
-            if self.active_request is None or self.active_request.request_id != request_id:
-                return False
-            self.active_request.approval_messages = approval_messages
-            return True
-
-    def set_cleanup_timer(self, request_id: str, timer: threading.Timer) -> bool:
-        with self.lock:
-            if self.active_request is None or self.active_request.request_id != request_id:
-                return False
-            self.cleanup_timer = timer
-            return True
-
-    def clear(self, request_id: str | None = None) -> None:
-        with self.lock:
-            if request_id is not None and self.active_request_id != request_id:
-                return
-            self.active_request = None
-            if self.cleanup_timer is not None:
-                self.cleanup_timer.cancel()
-                self.cleanup_timer = None
-
-    def status(self) -> dict[str, Any]:
-        with self.lock:
-            request = self.active_request
-            return {
-                "active_request_id": request.request_id if request is not None else None,
-                "active_user": request.user if request is not None else None,
-                "active_request": request.to_status_dict() if request is not None else None,
-            }
-
-    def notification_payload(self, request_id: str | None = None) -> tuple[int, dict[str, Any]] | None:
-        with self.lock:
-            request = self.active_request
-            if request is None:
-                return None
-            if request_id is not None and request.request_id != request_id:
-                return None
-            return request.uid, request.to_approval_payload()
 
 
 STATE = DaemonState()
@@ -187,18 +108,14 @@ class RequestHandler(socketserver.StreamRequestHandler):
                 return {"ok": False, "status": "denied", "exit_code": 126, "request_id": request_id}
 
             STATE.set_phase(request_id, RequestPhase.APPROVED)
-            install_broad_rule(user)
-            STATE.set_window_expires_at(request_id, int(time.time()) + window_seconds)
+            STATE.set_window_expires_at(request_id, open_broad_window(user, window_seconds))
             STATE.set_phase(request_id, RequestPhase.WINDOW_OPEN)
-            timer = threading.Timer(window_seconds, watchdog_cleanup, args=(request_id,))
-            timer.daemon = True
-            STATE.set_cleanup_timer(request_id, timer)
-            timer.start()
+            schedule_watchdog(STATE, request_id, window_seconds, send_cleanup_critical_alert_from_snapshot)
             append_jsonl(DAEMON_LOG, "window_opened", {"request_id": request_id, "user": user, "dropin": str(DROPIN_PATH), "seconds": window_seconds})
             return {"ok": True, "status": "approved", "request_id": request_id, "payload_hash": payload["payload_hash"], "window_seconds": window_seconds}
         except Exception as exc:
             self.mark_failed_request_best_effort(telegram, payload, str(exc))
-            cleanup_ok = cleanup_broad_rule()
+            cleanup_ok = close_broad_window()
             if not cleanup_ok:
                 self.send_cleanup_critical_alert_best_effort(uid, payload, "run_request_error")
             STATE.set_phase(request_id, RequestPhase.FAILED)
@@ -210,7 +127,7 @@ class RequestHandler(socketserver.StreamRequestHandler):
         uid = peer_uid(self.request)
         request_id = str(message.get("request_id") or "")
         notification = STATE.notification_payload(request_id or None)
-        cleanup_ok = cleanup_broad_rule()
+        cleanup_ok = close_broad_window()
         STATE.set_phase(request_id, RequestPhase.CLOSED if cleanup_ok else RequestPhase.FAILED)
         if not cleanup_ok:
             if notification is None:
@@ -335,13 +252,13 @@ class RequestHandler(socketserver.StreamRequestHandler):
                 )
 
     def handle_status(self) -> dict[str, Any]:
-        return {"ok": True, "status": "ok", "daemon_pid": os.getpid(), **STATE.status(), "dropin_exists": DROPIN_PATH.exists()}
+        return {"ok": True, "status": "ok", "daemon_pid": os.getpid(), **STATE.status(), "dropin_exists": broad_window_exists()}
 
     def handle_cancel(self, message: dict[str, Any]) -> dict[str, Any]:
         uid = peer_uid(self.request)
         request_id = str(message.get("request_id") or "")
         notification = STATE.notification_payload(request_id or None)
-        cleanup_ok = cleanup_broad_rule()
+        cleanup_ok = close_broad_window()
         STATE.set_phase(request_id, RequestPhase.CANCELLED if cleanup_ok else RequestPhase.FAILED)
         if not cleanup_ok:
             if notification is None:
@@ -355,7 +272,7 @@ class RequestHandler(socketserver.StreamRequestHandler):
     def handle_cleanup(self) -> dict[str, Any]:
         uid = peer_uid(self.request)
         notification = STATE.notification_payload()
-        cleanup_ok = cleanup_broad_rule()
+        cleanup_ok = close_broad_window()
         if not cleanup_ok:
             if notification is None:
                 self.send_cleanup_critical_alert_best_effort(uid, None, "cleanup")
@@ -366,15 +283,13 @@ class RequestHandler(socketserver.StreamRequestHandler):
         return {"ok": cleanup_ok, "status": "clean" if cleanup_ok else "cleanup_failed"}
 
 
-def watchdog_cleanup(request_id: str) -> None:
-    notification = STATE.notification_payload(request_id)
-    cleanup_ok = cleanup_broad_rule(retries=10, delay_seconds=0.5)
-    STATE.set_phase(request_id, RequestPhase.EXPIRED if cleanup_ok else RequestPhase.FAILED)
-    if not cleanup_ok:
-        handler = RequestHandler.__new__(RequestHandler)
-        handler.send_cleanup_critical_alert_best_effort_from_snapshot(notification, "watchdog", request_id)
-    STATE.clear(request_id)
-    append_jsonl(DAEMON_LOG, "window_watchdog_cleanup", {"request_id": request_id, "cleanup_ok": cleanup_ok})
+def send_cleanup_critical_alert_from_snapshot(
+    notification: tuple[int, dict[str, Any]] | None,
+    source: str,
+    request_id: str,
+) -> None:
+    handler = RequestHandler.__new__(RequestHandler)
+    handler.send_cleanup_critical_alert_best_effort_from_snapshot(notification, source, request_id)
 
 
 class UnixServer(socketserver.ThreadingUnixStreamServer):
@@ -385,7 +300,7 @@ class UnixServer(socketserver.ThreadingUnixStreamServer):
 def run_foreground(socket_path: Path = SOCKET_PATH) -> int:
     if os.geteuid() != 0:
         raise PermissionError("daemon must run as root")
-    cleanup_broad_rule()
+    close_broad_window()
     SOCKET_DIR.mkdir(parents=True, exist_ok=True)
     try:
         socket_path.unlink()
@@ -405,7 +320,7 @@ def run_foreground(socket_path: Path = SOCKET_PATH) -> int:
     except KeyboardInterrupt:
         pass
     finally:
-        cleanup_broad_rule()
+        close_broad_window()
         server.server_close()
         socket_path.unlink(missing_ok=True)
         append_jsonl(DAEMON_LOG, "daemon_stopped", {})

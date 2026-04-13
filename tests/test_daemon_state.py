@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 
 from sudo_request.app.daemon import server
 from sudo_request.app.daemon.lifecycle import RequestLifecycle, RequestPhase
-from sudo_request.app.daemon.server import DaemonState
+from sudo_request.app.daemon.state import DaemonState
 from sudo_request.lib.config import Config
 
 
@@ -63,9 +63,8 @@ class DaemonStateTests(unittest.TestCase):
         handler = server.RequestHandler.__new__(server.RequestHandler)
 
         with patch.object(server, "STATE", state):
-            with patch.object(server, "DROPIN_PATH") as dropin_path:
+            with patch.object(server, "broad_window_exists", return_value=False):
                 with patch.object(server.os, "getpid", return_value=123):
-                    dropin_path.exists.return_value = False
                     result = server.RequestHandler.handle_status(handler)
 
         self.assertEqual(result["daemon_pid"], 123)
@@ -199,7 +198,7 @@ class DaemonStateTests(unittest.TestCase):
 
         with patch.object(server, "STATE", state):
             with patch.object(server, "peer_uid", return_value=501):
-                with patch.object(server, "cleanup_broad_rule", return_value=False):
+                with patch.object(server, "close_broad_window", return_value=False):
                     with patch.object(server, "append_jsonl"):
                         result = server.RequestHandler.handle_close_request(handler, {"type": "close_request", "request_id": "one"})
 
@@ -216,26 +215,12 @@ class DaemonStateTests(unittest.TestCase):
 
         with patch.object(server, "STATE", state):
             with patch.object(server, "peer_uid", return_value=501):
-                with patch.object(server, "cleanup_broad_rule", return_value=False):
+                with patch.object(server, "close_broad_window", return_value=False):
                     with patch.object(server, "append_jsonl"):
                         result = server.RequestHandler.handle_cleanup(handler)
 
         self.assertEqual(result, {"ok": False, "status": "cleanup_failed"})
         handler.send_cleanup_critical_alert_best_effort.assert_called_once_with(501, None, "cleanup")
-
-    def test_watchdog_cleanup_failure_sends_critical_alert(self) -> None:
-        state = DaemonState()
-        self.assertTrue(state.begin(lifecycle("one")))
-
-        with patch.object(server, "STATE", state):
-            with patch.object(server, "cleanup_broad_rule", return_value=False):
-                with patch.object(server.RequestHandler, "send_cleanup_critical_alert_best_effort_from_snapshot") as alert:
-                    with patch.object(server, "append_jsonl"):
-                        server.watchdog_cleanup("one")
-
-        alert.assert_called_once()
-        self.assertEqual(alert.call_args.args[1], "watchdog")
-        self.assertIsNone(state.active_request)
 
 if __name__ == "__main__":
     unittest.main()

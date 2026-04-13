@@ -22,8 +22,8 @@
 - [x] request lifecycle 모델을 dataclass로 정리
 - [x] `DaemonState`를 active_request_id 중심에서 phase/command/expires_at을 담는 state object 중심으로 정리
 - [x] daemon peer uid 조회 로직을 `daemon/peer.py`로 분리
-- [ ] daemon watchdog/TTL cleanup 로직을 `daemon/watchdog.py`로 분리
-- [ ] broad sudoers window 제어를 `daemon/sudo_window.py`로 분리
+- [x] daemon watchdog/TTL cleanup 로직을 `daemon/watchdog.py`로 분리
+- [x] broad sudoers window 제어를 `daemon/sudo_window.py`로 분리
 - [x] daemon request dispatch/server 코드를 패키지화하되, `daemon.py` 파일명 충돌을 피하는 방식으로 단계적 이동
 - [ ] CLI 출력 메시지를 `output.py` 또는 app output helper로 분리
 - [x] `doctor` 구현을 `app/doctor.py`로 분리
