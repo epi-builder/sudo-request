@@ -14,6 +14,7 @@ from typing import Any
 from sudo_request.app.cli.cleanup import close_request_with_diagnostics
 from sudo_request.app.cli.doctor import command_doctor
 from sudo_request.app.cli.install import install_daemon, install_tool, uninstall_daemon, uninstall_tool, update_itself_command
+from sudo_request.app.cli.output import print_daemon_unreachable, print_error, print_error_response
 from sudo_request.app.cli.status import command_status
 from sudo_request.lib.audit import append_jsonl_best_effort, user_audit_path
 from sudo_request.lib.config import Config, load_config
@@ -89,17 +90,17 @@ def command_update_itself(source: str | None = None, window_seconds: int = 30) -
     try:
         cmd = update_itself_command(source)
     except Exception as exc:
-        print(f"sudo-request: update-itself: {exc}", file=sys.stderr)
+        print_error("policy_block", exit_code=EXIT_POLICY_BLOCK, action="update_itself", message=str(exc))
         return EXIT_POLICY_BLOCK
     return command_run(cmd, window_seconds)
 
 
 def command_run(cmd: list[str], window_seconds: int | None = None) -> int:
     if not cmd:
-        print("sudo-request run requires a command after --", file=sys.stderr)
+        print_error("policy_block", exit_code=EXIT_POLICY_BLOCK, action="run", message="sudo-request run requires a command after --")
         return EXIT_POLICY_BLOCK
     if window_seconds is not None and window_seconds <= 0:
-        print("sudo-request: --window-seconds must be positive", file=sys.stderr)
+        print_error("policy_block", exit_code=EXIT_POLICY_BLOCK, action="run", message="--window-seconds must be positive")
         return EXIT_POLICY_BLOCK
     subprocess.run(["/usr/bin/sudo", "-k"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     cfg = load_config(Path.home())
@@ -115,12 +116,10 @@ def command_run(cmd: list[str], window_seconds: int | None = None) -> int:
     try:
         response = ipc_request_with_heartbeat(request, cfg)
     except Exception as exc:
-        print(f"sudo-request: daemon request failed: {exc}", file=sys.stderr)
-        return EXIT_DAEMON_FAILURE
+        return print_daemon_unreachable(exc, action="run_request")
 
     if not response.get("ok"):
-        print(f"sudo-request: {response.get('status')}: {response.get('error', '')}", file=sys.stderr)
-        return int(response.get("exit_code", EXIT_DAEMON_FAILURE))
+        return print_error_response(response, fallback_exit_code=EXIT_DAEMON_FAILURE, action="run_request")
 
     request_id = str(response["request_id"])
     payload_hash = str(response["payload_hash"])
@@ -192,7 +191,6 @@ def print_ipc(message: dict[str, Any]) -> int:
     try:
         response = ipc_request(message)
     except Exception as exc:
-        print(f"sudo-request: daemon request failed: {exc}", file=sys.stderr)
-        return EXIT_DAEMON_FAILURE
+        return print_daemon_unreachable(exc, action=str(message.get("type") or "ipc"))
     print(json.dumps(response, indent=2, sort_keys=True))
     return 0 if response.get("ok") else int(response.get("exit_code", EXIT_POLICY_BLOCK))

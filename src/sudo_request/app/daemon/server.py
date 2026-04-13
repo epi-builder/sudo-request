@@ -106,7 +106,7 @@ class RequestHandler(socketserver.StreamRequestHandler):
             if decision.status == "denied":
                 STATE.set_phase(request_id, RequestPhase.DENIED)
                 STATE.clear(request_id)
-                return {"ok": False, "status": "denied", "exit_code": 126, "request_id": request_id}
+                return {"ok": False, "status": "denied", "exit_code": 126, "request_id": request_id, "error": "approval denied"}
 
             STATE.set_phase(request_id, RequestPhase.APPROVED)
             STATE.set_window_expires_at(request_id, open_broad_window(user, window_seconds))

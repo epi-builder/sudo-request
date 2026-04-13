@@ -28,7 +28,7 @@ During self-update, the daemon may restart before the CLI can send its final
 close request. This message is acceptable when the sudoers rule is already gone:
 
 ```text
-sudo-request: cleanup request could not reach daemon, but broad sudo rule is not installed
+sudo-request: error status=daemon_unreachable request_id=<id> action=close_request broad_rule=not_installed error_type=<error> message=<detail>
 ```
 
 After any install/update, verify:
@@ -43,6 +43,20 @@ Expected closed-window sudo result:
 ```text
 sudo: a password is required
 ```
+
+## Agent-Readable Errors
+
+Failures that agents commonly branch on are printed to stderr as key-value
+fields:
+
+```text
+sudo-request: error status=<code> exit_code=<code> action=<operation> message=<detail>
+```
+
+Stable `status` values include `timeout`, `denied`, `policy_block`,
+`daemon_unreachable`, `daemon_error`, and `cleanup_failed`. Optional fields such
+as `request_id`, `error_type`, `broad_rule`, and `dropin_path` are included when
+available.
 
 ## Using sudo-request For Sudo Commands
 
@@ -67,4 +81,3 @@ sudo-request run --window-seconds 120 -- /usr/bin/sudo /path/to/command
 ```
 
 Prefer absolute paths for root commands.
-

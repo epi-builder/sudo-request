@@ -13,8 +13,11 @@ from sudo_request.app.cli.main import command_run, command_update_itself, ipc_re
 
 class CliTests(unittest.TestCase):
     def test_command_run_rejects_non_positive_window(self) -> None:
-        with redirect_stderr(StringIO()):
+        with redirect_stderr(StringIO()) as stderr:
             self.assertEqual(command_run(["/bin/echo", "ok"], 0), 125)
+        self.assertIn("status=policy_block", stderr.getvalue())
+        self.assertIn("exit_code=125", stderr.getvalue())
+        self.assertIn("action=run", stderr.getvalue())
 
     def test_command_run_prints_running_and_exit_status(self) -> None:
         response = {"ok": True, "request_id": "req-1", "payload_hash": "hash-1", "window_seconds": 5}
@@ -47,6 +50,52 @@ class CliTests(unittest.TestCase):
             with patch("sudo_request.app.cli.main.command_run", return_value=0) as run:
                 self.assertEqual(command_update_itself("/src", 12), 0)
         run.assert_called_once_with(["/usr/bin/sudo", "/usr/bin/python3", "-m", "sudo_request", "install"], 12)
+
+    def test_command_run_prints_agent_readable_denied_error(self) -> None:
+        response = {"ok": False, "status": "denied", "exit_code": 126, "request_id": "req-1", "error": "approval denied"}
+
+        with patch("sudo_request.app.cli.main.load_config", return_value=Config(Path("/tmp/token"), [1])):
+            with patch("sudo_request.app.cli.main.ipc_request_with_heartbeat", return_value=response):
+                with patch("sudo_request.app.cli.main.subprocess.run", return_value=Mock(returncode=0)):
+                    with redirect_stderr(StringIO()) as stderr:
+                        self.assertEqual(command_run(["/bin/echo", "ok"], 3), 126)
+
+        output = stderr.getvalue()
+        self.assertIn("sudo-request: error", output)
+        self.assertIn("status=denied", output)
+        self.assertIn("exit_code=126", output)
+        self.assertIn("request_id=req-1", output)
+        self.assertIn("action=run_request", output)
+        self.assertIn("message='approval denied'", output)
+
+    def test_command_run_prints_agent_readable_timeout_error(self) -> None:
+        response = {"ok": False, "status": "timeout", "exit_code": 124, "request_id": "req-1", "error": "request expired by timeout"}
+
+        with patch("sudo_request.app.cli.main.load_config", return_value=Config(Path("/tmp/token"), [1])):
+            with patch("sudo_request.app.cli.main.ipc_request_with_heartbeat", return_value=response):
+                with patch("sudo_request.app.cli.main.subprocess.run", return_value=Mock(returncode=0)):
+                    with redirect_stderr(StringIO()) as stderr:
+                        self.assertEqual(command_run(["/bin/echo", "ok"], 3), 124)
+
+        output = stderr.getvalue()
+        self.assertIn("status=timeout", output)
+        self.assertIn("exit_code=124", output)
+        self.assertIn("request_id=req-1", output)
+        self.assertIn("message='request expired by timeout'", output)
+
+    def test_command_run_prints_agent_readable_daemon_unreachable_error(self) -> None:
+        with patch("sudo_request.app.cli.main.load_config", return_value=Config(Path("/tmp/token"), [1])):
+            with patch("sudo_request.app.cli.main.ipc_request_with_heartbeat", side_effect=ConnectionRefusedError("socket refused")):
+                with patch("sudo_request.app.cli.main.subprocess.run", return_value=Mock(returncode=0)):
+                    with redirect_stderr(StringIO()) as stderr:
+                        self.assertEqual(command_run(["/bin/echo", "ok"], 3), 127)
+
+        output = stderr.getvalue()
+        self.assertIn("status=daemon_unreachable", output)
+        self.assertIn("exit_code=127", output)
+        self.assertIn("action=run_request", output)
+        self.assertIn("error_type=ConnectionRefusedError", output)
+        self.assertIn("message='socket refused'", output)
 
     def test_ipc_request_with_heartbeat_prints_waiting_message(self) -> None:
         def slow_ipc(_message):

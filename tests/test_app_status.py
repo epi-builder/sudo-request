@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from unittest.mock import patch
 
@@ -61,6 +61,19 @@ class StatusTests(unittest.TestCase):
             self.assertEqual(command_status(lambda _message: response, json_output=True), 0)
 
         self.assertEqual(json.loads(stdout.getvalue()), response)
+
+    def test_command_status_prints_agent_readable_daemon_unreachable_to_stderr(self) -> None:
+        def failing_ipc(_message):
+            raise FileNotFoundError("socket missing")
+
+        with redirect_stderr(StringIO()) as stderr:
+            self.assertEqual(command_status(failing_ipc), 127)
+
+        output = stderr.getvalue()
+        self.assertIn("status=daemon_unreachable", output)
+        self.assertIn("exit_code=127", output)
+        self.assertIn("action=status", output)
+        self.assertIn("error_type=FileNotFoundError", output)
 
 
 if __name__ == "__main__":

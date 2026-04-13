@@ -10,7 +10,7 @@
 - [x] `sudo-request doctor`에 socket/drop-in/launchd 파일 owner/mode 권한 검사 추가
 - [x] daemon active request state를 디스크에 저장해 restart/update 이후 cleanup context와 Telegram lifecycle status 복구
 - [ ] long-running command 실행 중 선택적 heartbeat 출력 지원
-- [ ] timeout/deny/daemon failure stderr 메시지 포맷을 agent가 읽기 쉽도록 더 일관화
+- [x] timeout/deny/daemon failure stderr 메시지 포맷을 agent가 읽기 쉽도록 더 일관화
 - [ ] 긴 `--window-seconds` 요청이 max에 가까울 때 Telegram 승인 메시지에 추가 경고 표시
 - [ ] self-management/install 명령처럼 `/usr/bin/sudo /usr/bin/env ... python -m sudo_request install` 형태의 요청을 Telegram에서 더 명확히 표시
 

@@ -6,7 +6,8 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
-from sudo_request.lib.constants import EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK
+from sudo_request.app.cli.output import print_daemon_unreachable
+from sudo_request.lib.constants import EXIT_POLICY_BLOCK
 
 IPCRequest = Callable[[dict[str, Any]], dict[str, Any]]
 
@@ -15,8 +16,7 @@ def command_status(ipc_request: IPCRequest, *, json_output: bool = False) -> int
     try:
         response = ipc_request({"type": "status"})
     except Exception as exc:
-        print(f"sudo-request: daemon request failed: {exc}")
-        return EXIT_DAEMON_FAILURE
+        return print_daemon_unreachable(exc, action="status")
 
     if json_output:
         print(json.dumps(response, indent=2, sort_keys=True))

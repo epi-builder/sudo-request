@@ -218,6 +218,8 @@ Completed since the original audit:
   lifecycle visibility.
 - Persisted daemon active request state for restart/update recovery after the
   sudo window opens.
+- Consistent agent-readable stderr error lines for timeout, denial, daemon
+  reachability failures, policy blocks, and cleanup warnings.
 
 Remaining highest priority mitigations:
 
@@ -225,7 +227,6 @@ Remaining highest priority mitigations:
    validate that the original argv execution can differ from the displayed path.
 2. Consider tightening socket permissions if multi-user local scenarios matter.
 3. Add rate limiting or backoff for repeated requests.
-4. Make timeout/deny/daemon failure stderr messages more consistent for agents.
 
 ## Non-Goals for v1
 

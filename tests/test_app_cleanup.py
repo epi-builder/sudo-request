@@ -19,7 +19,8 @@ class CleanupTests(unittest.TestCase):
 
             with redirect_stderr(StringIO()) as stderr:
                 close_request_with_diagnostics("req", failing_ipc, dropin)
-        self.assertIn("could not reach daemon, but broad sudo rule is not installed", stderr.getvalue())
+        self.assertIn("status=daemon_unreachable", stderr.getvalue())
+        self.assertIn("broad_rule=not_installed", stderr.getvalue())
 
     def test_cleanup_diagnostics_warns_when_rule_remains_after_disconnect(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -32,8 +33,9 @@ class CleanupTests(unittest.TestCase):
             with redirect_stderr(StringIO()) as stderr:
                 close_request_with_diagnostics("req", failing_ipc, dropin)
         output = stderr.getvalue()
-        self.assertIn("cleanup request failed", output)
-        self.assertIn("broad sudo rule still exists", output)
+        self.assertIn("status=cleanup_failed", output)
+        self.assertIn("broad_rule=installed", output)
+        self.assertIn("dropin_path=", output)
 
 
 if __name__ == "__main__":

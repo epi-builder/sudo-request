@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from sudo_request.app.cli.output import print_error
 from sudo_request.lib.constants import DROPIN_PATH
 
 
@@ -16,20 +16,42 @@ def close_request_with_diagnostics(request_id: str, ipc_request: IpcRequest, dro
         close_response = ipc_request({"type": "close_request", "request_id": request_id})
     except Exception as exc:
         if dropin_path.exists():
-            print(
-                f"sudo-request: cleanup request failed and broad sudo rule still exists at {dropin_path}: {exc}",
-                file=sys.stderr,
+            print_error(
+                "cleanup_failed",
+                action="close_request",
+                request_id=request_id,
+                broad_rule="installed",
+                dropin_path=str(dropin_path),
+                error_type=type(exc).__name__,
+                message=str(exc),
             )
         else:
-            print(
-                "sudo-request: cleanup request could not reach daemon, but broad sudo rule is not installed",
-                file=sys.stderr,
+            print_error(
+                "daemon_unreachable",
+                action="close_request",
+                request_id=request_id,
+                broad_rule="not_installed",
+                error_type=type(exc).__name__,
+                message=str(exc),
             )
         return
 
     if close_response.get("ok"):
         return
     if dropin_path.exists():
-        print(f"sudo-request: cleanup warning: {close_response}; broad sudo rule still exists at {dropin_path}", file=sys.stderr)
+        print_error(
+            str(close_response.get("status") or "cleanup_failed"),
+            action="close_request",
+            request_id=request_id,
+            broad_rule="installed",
+            dropin_path=str(dropin_path),
+            message=str(close_response.get("error") or close_response),
+        )
     else:
-        print(f"sudo-request: cleanup warning: {close_response}; broad sudo rule is not installed", file=sys.stderr)
+        print_error(
+            str(close_response.get("status") or "cleanup_failed"),
+            action="close_request",
+            request_id=request_id,
+            broad_rule="not_installed",
+            message=str(close_response.get("error") or close_response),
+        )

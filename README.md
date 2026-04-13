@@ -72,7 +72,7 @@ During reinstall the daemon may restart before the CLI can send its final close
 request. If cleanup already happened, this is reported as:
 
 ```text
-sudo-request: cleanup request could not reach daemon, but broad sudo rule is not installed
+sudo-request: error status=daemon_unreachable request_id=<id> action=close_request broad_rule=not_installed error_type=<error> message=<detail>
 ```
 
 See [docs/operations.md](docs/operations.md) for the detailed update flow,
