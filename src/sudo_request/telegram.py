@@ -66,6 +66,9 @@ class TelegramClient:
         message_id = message.get("message_id")
         if chat_id is None or message_id is None:
             return
+        self.mark_message(int(chat_id), int(message_id), payload, status)
+
+    def mark_message(self, chat_id: int, message_id: int, payload: dict[str, Any], status: str) -> None:
         try:
             self._post(
                 "editMessageText",
@@ -110,7 +113,12 @@ class TelegramClient:
                     self.answer_callback(str(callback["id"]), "Denied")
                     self.mark_decision(callback, payload, "DENIED")
                     return ApprovalResult("denied", user_id)
-        return ApprovalResult("timeout", None, "approval timed out")
+        for message in payload.get("approval_messages", []):
+            chat_id = message.get("chat_id")
+            message_id = message.get("message_id")
+            if chat_id is not None and message_id is not None:
+                self.mark_message(int(chat_id), int(message_id), payload, "EXPIRED")
+        return ApprovalResult("timeout", None, "request expired by timeout")
 
 
 def approval_message_text(payload: dict[str, Any], status: str) -> str:

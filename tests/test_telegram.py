@@ -67,6 +67,23 @@ class TelegramTests(unittest.TestCase):
         self.assertIn("[DENIED]", calls[0][1]["text"])
         self.assertEqual(calls[0][1]["reply_markup"], {"inline_keyboard": []})
 
+    def test_wait_for_decision_marks_timeout_expired(self) -> None:
+        payload = self.payload()
+        payload["approval_messages"] = [{"chat_id": 123, "message_id": 456}]
+        calls = []
+
+        def fake_post(method, body, timeout=30):
+            calls.append((method, body))
+            return {"ok": True}
+
+        client = TelegramClient("token")
+        with patch.object(client, "_post", side_effect=fake_post):
+            result = client.wait_for_decision(payload, [1], 0)
+        self.assertEqual(result.status, "timeout")
+        self.assertEqual(result.message, "request expired by timeout")
+        self.assertEqual(calls[0][0], "editMessageText")
+        self.assertIn("[EXPIRED]", calls[0][1]["text"])
+
 
 if __name__ == "__main__":
     unittest.main()
