@@ -86,6 +86,33 @@ class DaemonStateTests(unittest.TestCase):
         self.assertEqual(result["status"], "request_mismatch")
         self.assertEqual(state.active_request.phase, RequestPhase.PENDING_APPROVAL)
 
+    def test_mark_failed_request_best_effort_updates_existing_approval_messages(self) -> None:
+        handler = server.RequestHandler.__new__(server.RequestHandler)
+        telegram = Mock()
+        payload = lifecycle("one").to_approval_payload()
+        payload["approval_messages"] = [{"chat_id": 123, "message_id": 456}]
+
+        server.RequestHandler.mark_failed_request_best_effort(handler, telegram, payload, "network down")
+
+        telegram.mark_status.assert_called_once_with(123, 456, payload, "FAILED")
+
+    def test_mark_failed_request_best_effort_audits_update_failure(self) -> None:
+        handler = server.RequestHandler.__new__(server.RequestHandler)
+        telegram = Mock()
+        telegram.mark_status.side_effect = RuntimeError("edit failed")
+        payload = lifecycle("one").to_approval_payload()
+        payload["approval_messages"] = [{"chat_id": 123, "message_id": 456}]
+
+        with patch.object(server, "append_jsonl") as audit:
+            server.RequestHandler.mark_failed_request_best_effort(handler, telegram, payload, "network down")
+
+        audit.assert_called_once()
+        self.assertEqual(audit.call_args.args[1], "telegram_status_update_failed")
+        self.assertEqual(audit.call_args.args[2]["request_id"], "one")
+        self.assertEqual(audit.call_args.args[2]["status"], "FAILED")
+        self.assertIn("edit failed", audit.call_args.args[2]["error"])
+        self.assertEqual(audit.call_args.args[2]["request_error"], "network down")
+
     def test_peer_uid_uses_darwin_local_peercred_fallback(self) -> None:
         sock = Mock()
         del sock.getpeereid

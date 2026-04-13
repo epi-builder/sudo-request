@@ -167,16 +167,17 @@ class RequestHandler(socketserver.StreamRequestHandler):
             return {"ok": False, "status": "busy", "exit_code": 125, "error": "another request is active"}
 
         append_jsonl(DAEMON_LOG, "request_created", payload)
+        telegram: TelegramClient | None = None
         try:
             token = read_token(cfg.telegram_bot_token_file)
             if not cfg.telegram_allowed_user_ids:
                 raise ValueError("telegram_allowed_user_ids is empty")
             telegram = TelegramClient(token)
             approval_messages = []
+            payload["approval_messages"] = approval_messages
             for chat_id in cfg.telegram_allowed_user_ids:
                 message_id = telegram.send_approval_request(chat_id, payload)
                 approval_messages.append({"chat_id": chat_id, "message_id": message_id})
-            payload["approval_messages"] = approval_messages
             STATE.set_approval_messages(request_id, approval_messages)
             payload["payload_hash"] = payload_hash({k: v for k, v in payload.items() if k not in {"payload_hash", "approval_messages"}})
             decision = telegram.wait_for_approval_decision(payload, cfg.telegram_allowed_user_ids, cfg.approval_timeout_seconds)
@@ -201,6 +202,7 @@ class RequestHandler(socketserver.StreamRequestHandler):
             append_jsonl(DAEMON_LOG, "window_opened", {"request_id": request_id, "user": user, "dropin": str(DROPIN_PATH), "seconds": window_seconds})
             return {"ok": True, "status": "approved", "request_id": request_id, "payload_hash": payload["payload_hash"], "window_seconds": window_seconds}
         except Exception as exc:
+            self.mark_failed_request_best_effort(telegram, payload, str(exc))
             cleanup_broad_rule()
             STATE.set_phase(request_id, RequestPhase.FAILED)
             STATE.clear(request_id)
@@ -263,6 +265,23 @@ class RequestHandler(socketserver.StreamRequestHandler):
                     telegram.mark_status(int(chat_id), int(message_id), payload, status)
         except Exception as exc:
             append_jsonl(DAEMON_LOG, "telegram_status_update_failed", {"request_id": payload.get("request_id"), "status": status, "error": str(exc)})
+
+    def mark_failed_request_best_effort(self, telegram: TelegramClient | None, payload: dict[str, Any], error: str) -> None:
+        if telegram is None:
+            return
+        for message in payload.get("approval_messages", []):
+            chat_id = message.get("chat_id")
+            message_id = message.get("message_id")
+            if chat_id is None or message_id is None:
+                continue
+            try:
+                telegram.mark_status(int(chat_id), int(message_id), payload, "FAILED")
+            except Exception as exc:
+                append_jsonl(
+                    DAEMON_LOG,
+                    "telegram_status_update_failed",
+                    {"request_id": payload.get("request_id"), "status": "FAILED", "error": str(exc), "request_error": error},
+                )
 
     def handle_status(self) -> dict[str, Any]:
         return {"ok": True, "status": "ok", **STATE.status(), "dropin_exists": DROPIN_PATH.exists()}

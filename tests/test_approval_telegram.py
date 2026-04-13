@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from sudo_request.lib.approval.decision import approval_callback_data
 from sudo_request.lib.approval.message import approval_message_text, format_local_timestamp
 from sudo_request.lib.approval.telegram import TelegramClient
 
@@ -69,6 +70,12 @@ class TelegramTests(unittest.TestCase):
         self.assertIn("[DENIED]", calls[0][1]["text"])
         self.assertEqual(calls[0][1]["reply_markup"], {"inline_keyboard": []})
 
+    def test_mark_status_raises_when_telegram_edit_fails(self) -> None:
+        client = TelegramClient("token")
+        with patch.object(client, "_post", side_effect=RuntimeError("edit failed")):
+            with self.assertRaisesRegex(RuntimeError, "edit failed"):
+                client.mark_status(123, 456, self.payload(), "FAILED")
+
     def test_wait_for_approval_decision_marks_timeout_expired(self) -> None:
         payload = self.payload()
         payload["approval_messages"] = [{"chat_id": 123, "message_id": 456}]
@@ -85,6 +92,32 @@ class TelegramTests(unittest.TestCase):
         self.assertEqual(result.message, "request expired by timeout")
         self.assertEqual(calls[0][0], "editMessageText")
         self.assertIn("[EXPIRED]", calls[0][1]["text"])
+
+    def test_wait_for_approval_decision_ignores_status_edit_failure_after_approval(self) -> None:
+        payload = self.payload()
+        callback = {
+            "id": "callback-1",
+            "from": {"id": 123},
+            "data": approval_callback_data("a", payload),
+            "message": {"chat": {"id": 123}, "message_id": 456},
+        }
+        update = {"update_id": 1, "callback_query": callback}
+        calls = []
+
+        def fake_post(method, _body, timeout=30):
+            calls.append(method)
+            if method == "editMessageText":
+                raise RuntimeError("edit failed")
+            return {"ok": True}
+
+        client = TelegramClient("token")
+        with patch.object(client, "_get", return_value={"ok": True, "result": [update]}):
+            with patch.object(client, "_post", side_effect=fake_post):
+                result = client.wait_for_approval_decision(payload, [123], 10)
+
+        self.assertEqual(result.status, "approved")
+        self.assertIn("answerCallbackQuery", calls)
+        self.assertIn("editMessageText", calls)
 
 
 if __name__ == "__main__":

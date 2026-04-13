@@ -58,14 +58,11 @@ class TelegramClient:
         self.mark_status(int(chat_id), int(message_id), payload, status)
 
     def mark_status(self, chat_id: int, message_id: int, payload: dict[str, Any], status: str) -> None:
-        try:
-            self._post(
-                "editMessageText",
-                {"chat_id": chat_id, "message_id": message_id, "text": approval_message_text(payload, status), "reply_markup": {"inline_keyboard": []}},
-                timeout=10,
-            )
-        except Exception:
-            return
+        self._post(
+            "editMessageText",
+            {"chat_id": chat_id, "message_id": message_id, "text": approval_message_text(payload, status), "reply_markup": {"inline_keyboard": []}},
+            timeout=10,
+        )
 
     def wait_for_approval_decision(self, payload: dict[str, Any], allowed_user_ids: list[int], timeout_seconds: int) -> ApprovalResult:
         deadline = time.time() + timeout_seconds
@@ -85,12 +82,18 @@ class TelegramClient:
                 if decision.answer_text is not None and decision.callback_id is not None:
                     self.answer_callback(decision.callback_id, decision.answer_text)
                 if decision.message_status is not None and decision.callback is not None:
-                    self.mark_callback_status(decision.callback, payload, decision.message_status)
+                    try:
+                        self.mark_callback_status(decision.callback, payload, decision.message_status)
+                    except Exception:
+                        pass
                 if decision.is_terminal:
                     return ApprovalResult(decision.status, decision.approver_id)
         for message in payload.get("approval_messages", []):
             chat_id = message.get("chat_id")
             message_id = message.get("message_id")
             if chat_id is not None and message_id is not None:
-                self.mark_status(int(chat_id), int(message_id), payload, "EXPIRED")
+                try:
+                    self.mark_status(int(chat_id), int(message_id), payload, "EXPIRED")
+                except Exception:
+                    pass
         return timeout_result()
