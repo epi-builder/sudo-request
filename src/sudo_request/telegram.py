@@ -5,6 +5,7 @@ import time
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 
@@ -122,7 +123,7 @@ def approval_message_text(payload: dict[str, Any], status: str) -> str:
         f"Resolved executable: {payload['resolved_executable']}\n"
         f"Parent process: {payload['parent_process']}\n"
         f"Requested sudo window: {payload['requested_window_seconds']}s (max {payload['max_window_seconds']}s)\n"
-        f"Expires at: {payload['expires_at']}\n"
+        f"Expires at: {format_local_timestamp(payload['expires_at'])}\n"
         f"SHA256 payload hash: {payload['payload_hash']}\n\n"
         "WARNING: while approved, this local user can run passwordless sudo from any process."
     )
@@ -136,3 +137,9 @@ def _quote_arg(arg: str) -> str:
     if arg and all(ch.isalnum() or ch in "._-/:=+" for ch in arg):
         return arg
     return "'" + arg.replace("'", "'\\''") + "'"
+
+
+def format_local_timestamp(epoch_seconds: int | float | str) -> str:
+    epoch = int(epoch_seconds)
+    dt = datetime.fromtimestamp(epoch).astimezone()
+    return f"{dt.strftime('%Y-%m-%d %H:%M:%S %Z %z')} ({epoch})"

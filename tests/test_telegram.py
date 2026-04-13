@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from sudo_request.telegram import TelegramClient, approval_message_text
+from sudo_request.telegram import TelegramClient, approval_message_text, format_local_timestamp
 
 
 class TelegramTests(unittest.TestCase):
@@ -42,6 +42,13 @@ class TelegramTests(unittest.TestCase):
     def test_approval_message_text_includes_status(self) -> None:
         self.assertIn("[APPROVED]", approval_message_text(self.payload(), "APPROVED"))
         self.assertIn("Requested sudo window: 30s (max 300s)", approval_message_text(self.payload(), "APPROVED"))
+        self.assertRegex(approval_message_text(self.payload(), "APPROVED"), r"Expires at: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} .+ \+\d{4} \(1\)")
+        self.assertIn("(1)", approval_message_text(self.payload(), "APPROVED"))
+
+    def test_format_local_timestamp_keeps_epoch_for_auditability(self) -> None:
+        formatted = format_local_timestamp(1)
+        self.assertRegex(formatted, r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} .+ \+\d{4} \(1\)")
+        self.assertIn("(1)", formatted)
 
     def test_mark_decision_edits_message_and_removes_buttons(self) -> None:
         calls = []
