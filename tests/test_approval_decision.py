@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from sudo_request.approval.decision import (
+from sudo_request.lib.approval.decision import (
     approval_callback_data,
     callback_matches_payload,
     evaluate_callback,

@@ -7,8 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from ..constants import BIN_PATH, EXIT_DAEMON_FAILURE, INSTALL_PREFIX, LAUNCHD_PLIST
-from ..security.sudoers import cleanup_broad_rule
+from sudo_request.lib.constants import BIN_PATH, EXIT_DAEMON_FAILURE, INSTALL_PREFIX, LAUNCHD_PLIST
+from sudo_request.lib.security.sudoers import cleanup_broad_rule
 
 
 def install_tool() -> int:
@@ -49,7 +49,7 @@ def install_tool() -> int:
 
 
 def project_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    return Path(__file__).resolve().parents[4]
 
 
 def resolve_update_source(source: str | None = None) -> Path:

@@ -5,7 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from ..constants import DROPIN_PATH
+from sudo_request.lib.constants import DROPIN_PATH
 
 
 IpcRequest = Callable[[dict[str, Any]], dict[str, Any]]

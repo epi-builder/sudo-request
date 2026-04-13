@@ -4,8 +4,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from sudo_request.app.install import project_root, render_launchd_plist, resolve_update_source, update_itself_command
-from sudo_request.constants import INSTALL_PREFIX
+from sudo_request.app.cli.install import project_root, render_launchd_plist, resolve_update_source, update_itself_command
+from sudo_request.lib.constants import INSTALL_PREFIX
 
 
 class InstallTests(unittest.TestCase):

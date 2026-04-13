@@ -3,8 +3,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from sudo_request.approval.message import approval_message_text, format_local_timestamp
-from sudo_request.approval.telegram import TelegramClient
+from sudo_request.lib.approval.message import approval_message_text, format_local_timestamp
+from sudo_request.lib.approval.telegram import TelegramClient
 
 
 class TelegramTests(unittest.TestCase):

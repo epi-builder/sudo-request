@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from sudo_request.security.payload import build_payload, payload_hash, resolve_executable, validate_username
+from sudo_request.lib.security.payload import build_payload, payload_hash, resolve_executable, validate_username
 
 
 class PayloadTests(unittest.TestCase):

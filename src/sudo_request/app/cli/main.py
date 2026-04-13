@@ -11,12 +11,12 @@ import time
 from pathlib import Path
 from typing import Any
 
-from sudo_request.audit import append_jsonl_best_effort, user_audit_path
-from sudo_request.app.cleanup import close_request_with_diagnostics
-from sudo_request.app.install import install_daemon, install_tool, uninstall_daemon, uninstall_tool, update_itself_command
-from sudo_request.config import Config, config_path, load_config
-from sudo_request.constants import BIN_PATH, EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK, INSTALL_PREFIX, LAUNCHD_PLIST, SOCKET_PATH
-from sudo_request.ipc import recv_json_line, send_json_line
+from sudo_request.app.cli.cleanup import close_request_with_diagnostics
+from sudo_request.app.cli.install import install_daemon, install_tool, uninstall_daemon, uninstall_tool, update_itself_command
+from sudo_request.lib.audit import append_jsonl_best_effort, user_audit_path
+from sudo_request.lib.config import Config, config_path, load_config
+from sudo_request.lib.constants import BIN_PATH, EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK, INSTALL_PREFIX, LAUNCHD_PLIST, SOCKET_PATH
+from sudo_request.lib.ipc import recv_json_line, send_json_line
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -73,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         return command_update_itself(args.source, args.window_seconds)
     if args.command == "cleanup":
         if os.geteuid() == 0:
-            from sudo_request.security.sudoers import cleanup_broad_rule
+            from sudo_request.lib.security.sudoers import cleanup_broad_rule
 
             cleanup_broad_rule()
             print("cleanup complete")

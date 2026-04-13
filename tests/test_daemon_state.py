@@ -3,14 +3,10 @@ from __future__ import annotations
 import unittest
 from unittest.mock import Mock
 
-from sudo_request import daemon as legacy_daemon
 from sudo_request.app.daemon.server import DaemonState, peer_uid
 
 
 class DaemonStateTests(unittest.TestCase):
-    def test_legacy_daemon_module_reexports_app_entrypoints(self) -> None:
-        self.assertIs(legacy_daemon.DaemonState, DaemonState)
-
     def test_single_active_request(self) -> None:
         state = DaemonState()
         self.assertTrue(state.begin("one", "epikem"))

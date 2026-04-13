@@ -11,13 +11,13 @@ import time
 from pathlib import Path
 from typing import Any
 
-from sudo_request.audit import append_jsonl
-from sudo_request.approval.telegram import TelegramClient
-from sudo_request.config import load_config, read_token
-from sudo_request.constants import DAEMON_LOG, DROPIN_PATH, EXIT_DAEMON_FAILURE, SOCKET_DIR, SOCKET_PATH
-from sudo_request.ipc import recv_json_line, send_json_line
-from sudo_request.security.payload import build_payload, payload_hash, validate_username
-from sudo_request.security.sudoers import cleanup_broad_rule, install_broad_rule
+from sudo_request.lib.audit import append_jsonl
+from sudo_request.lib.approval.telegram import TelegramClient
+from sudo_request.lib.config import load_config, read_token
+from sudo_request.lib.constants import DAEMON_LOG, DROPIN_PATH, EXIT_DAEMON_FAILURE, SOCKET_DIR, SOCKET_PATH
+from sudo_request.lib.ipc import recv_json_line, send_json_line
+from sudo_request.lib.security.payload import build_payload, payload_hash, validate_username
+from sudo_request.lib.security.sudoers import cleanup_broad_rule, install_broad_rule
 
 
 class DaemonState:

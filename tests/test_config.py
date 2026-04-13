@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from sudo_request.config import load_config
+from sudo_request.lib.config import load_config
 
 
 class ConfigTests(unittest.TestCase):

@@ -138,12 +138,12 @@ src/sudo_request/
   app/
     cli/       user-level CLI entrypoint and command flow
     daemon/    root-level IPC server and broad window lifecycle
-    cleanup.py CLI-side cleanup diagnostics
-    install.py install, uninstall, and self-update helpers
-  approval/    Telegram approval client, decision, and message formatting
-  security/    payload hashing, command validation, sudoers drop-in handling
-  cli.py       compatibility shim for the CLI app
-  daemon.py    compatibility shim for the daemon app
+  lib/
+    approval/  Telegram approval client, decision, and message formatting
+    security/  payload hashing, command validation, sudoers drop-in handling
+    config.py  user config loading
+    ipc.py     JSON-line Unix socket helpers
+    audit.py   JSONL audit log helpers
 ```
 
 Tests follow the same responsibility split with `test_app_*`,

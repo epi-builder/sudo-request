@@ -7,15 +7,11 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-from sudo_request.config import Config
-from sudo_request import cli as legacy_cli
+from sudo_request.lib.config import Config
 from sudo_request.app.cli.main import command_run, command_update_itself, ipc_request_with_heartbeat
 
 
 class CliTests(unittest.TestCase):
-    def test_legacy_cli_module_reexports_app_entrypoints(self) -> None:
-        self.assertIs(legacy_cli.command_run, command_run)
-
     def test_command_run_rejects_non_positive_window(self) -> None:
         with redirect_stderr(StringIO()):
             self.assertEqual(command_run(["/bin/echo", "ok"], 0), 125)
@@ -28,7 +24,7 @@ class CliTests(unittest.TestCase):
 
     def test_ipc_request_with_heartbeat_prints_waiting_message(self) -> None:
         def slow_ipc(_message):
-            time.sleep(0.03)
+            time.sleep(0.2)
             return {"ok": True}
 
         cfg = Config(Path("/tmp/token"), [1], approval_wait_heartbeat_seconds=0.01)
