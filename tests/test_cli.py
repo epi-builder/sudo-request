@@ -5,10 +5,10 @@ import time
 from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
+from sudo_request.app.cli.run import command_run, command_update_itself, ipc_request_with_heartbeat
 from sudo_request.lib.config import Config
-from sudo_request.app.cli.main import command_run, command_update_itself, ipc_request_with_heartbeat
 
 
 class CliTests(unittest.TestCase):
@@ -29,12 +29,12 @@ class CliTests(unittest.TestCase):
                 return Mock(returncode=7)
             return Mock(returncode=0)
 
-        with patch("sudo_request.app.cli.main.load_config", return_value=Config(Path("/tmp/token"), [1])):
-            with patch("sudo_request.app.cli.main.ipc_request_with_heartbeat", return_value=response):
-                with patch("sudo_request.app.cli.main.close_request_with_diagnostics"):
-                    with patch("sudo_request.app.cli.main.append_jsonl_best_effort"):
-                        with patch("sudo_request.app.cli.main.send_lifecycle_event_best_effort") as lifecycle:
-                            with patch("sudo_request.app.cli.main.subprocess.run", side_effect=fake_run):
+        with patch("sudo_request.app.cli.run.load_config", return_value=Config(Path("/tmp/token"), [1])):
+            with patch("sudo_request.app.cli.run.ipc_request_with_heartbeat", return_value=response):
+                with patch("sudo_request.app.cli.run.close_request_with_diagnostics"):
+                    with patch("sudo_request.app.cli.run.append_jsonl_best_effort"):
+                        with patch("sudo_request.app.cli.run.send_lifecycle_event_best_effort") as lifecycle:
+                            with patch("sudo_request.app.cli.run.subprocess.run", side_effect=fake_run):
                                 with redirect_stderr(StringIO()) as stderr:
                                     self.assertEqual(command_run(["/bin/false"], 3), 7)
 
@@ -46,17 +46,17 @@ class CliTests(unittest.TestCase):
         self.assertEqual(lifecycle.call_args_list[1].args, ("req-1", "hash-1", "done", 7))
 
     def test_command_update_itself_wraps_install_command(self) -> None:
-        with patch("sudo_request.app.cli.main.update_itself_command", return_value=["/usr/bin/sudo", "/usr/bin/python3", "-m", "sudo_request", "install"]):
-            with patch("sudo_request.app.cli.main.command_run", return_value=0) as run:
+        with patch("sudo_request.app.cli.run.update_itself_command", return_value=["/usr/bin/sudo", "/usr/bin/python3", "-m", "sudo_request", "install"]):
+            with patch("sudo_request.app.cli.run.command_run", return_value=0) as run:
                 self.assertEqual(command_update_itself("/src", 12), 0)
-        run.assert_called_once_with(["/usr/bin/sudo", "/usr/bin/python3", "-m", "sudo_request", "install"], 12)
+        run.assert_called_once_with(["/usr/bin/sudo", "/usr/bin/python3", "-m", "sudo_request", "install"], 12, ANY)
 
     def test_command_run_prints_agent_readable_denied_error(self) -> None:
         response = {"ok": False, "status": "denied", "exit_code": 126, "request_id": "req-1", "error": "approval denied"}
 
-        with patch("sudo_request.app.cli.main.load_config", return_value=Config(Path("/tmp/token"), [1])):
-            with patch("sudo_request.app.cli.main.ipc_request_with_heartbeat", return_value=response):
-                with patch("sudo_request.app.cli.main.subprocess.run", return_value=Mock(returncode=0)):
+        with patch("sudo_request.app.cli.run.load_config", return_value=Config(Path("/tmp/token"), [1])):
+            with patch("sudo_request.app.cli.run.ipc_request_with_heartbeat", return_value=response):
+                with patch("sudo_request.app.cli.run.subprocess.run", return_value=Mock(returncode=0)):
                     with redirect_stderr(StringIO()) as stderr:
                         self.assertEqual(command_run(["/bin/echo", "ok"], 3), 126)
 
@@ -71,9 +71,9 @@ class CliTests(unittest.TestCase):
     def test_command_run_prints_agent_readable_timeout_error(self) -> None:
         response = {"ok": False, "status": "timeout", "exit_code": 124, "request_id": "req-1", "error": "request expired by timeout"}
 
-        with patch("sudo_request.app.cli.main.load_config", return_value=Config(Path("/tmp/token"), [1])):
-            with patch("sudo_request.app.cli.main.ipc_request_with_heartbeat", return_value=response):
-                with patch("sudo_request.app.cli.main.subprocess.run", return_value=Mock(returncode=0)):
+        with patch("sudo_request.app.cli.run.load_config", return_value=Config(Path("/tmp/token"), [1])):
+            with patch("sudo_request.app.cli.run.ipc_request_with_heartbeat", return_value=response):
+                with patch("sudo_request.app.cli.run.subprocess.run", return_value=Mock(returncode=0)):
                     with redirect_stderr(StringIO()) as stderr:
                         self.assertEqual(command_run(["/bin/echo", "ok"], 3), 124)
 
@@ -84,9 +84,9 @@ class CliTests(unittest.TestCase):
         self.assertIn("message='request expired by timeout'", output)
 
     def test_command_run_prints_agent_readable_daemon_unreachable_error(self) -> None:
-        with patch("sudo_request.app.cli.main.load_config", return_value=Config(Path("/tmp/token"), [1])):
-            with patch("sudo_request.app.cli.main.ipc_request_with_heartbeat", side_effect=ConnectionRefusedError("socket refused")):
-                with patch("sudo_request.app.cli.main.subprocess.run", return_value=Mock(returncode=0)):
+        with patch("sudo_request.app.cli.run.load_config", return_value=Config(Path("/tmp/token"), [1])):
+            with patch("sudo_request.app.cli.run.ipc_request_with_heartbeat", side_effect=ConnectionRefusedError("socket refused")):
+                with patch("sudo_request.app.cli.run.subprocess.run", return_value=Mock(returncode=0)):
                     with redirect_stderr(StringIO()) as stderr:
                         self.assertEqual(command_run(["/bin/echo", "ok"], 3), 127)
 
@@ -103,9 +103,8 @@ class CliTests(unittest.TestCase):
             return {"ok": True}
 
         cfg = Config(Path("/tmp/token"), [1], approval_wait_heartbeat_seconds=0.01)
-        with patch("sudo_request.app.cli.main.ipc_request", side_effect=slow_ipc):
-            with redirect_stderr(StringIO()) as stderr:
-                self.assertEqual(ipc_request_with_heartbeat({"type": "status"}, cfg), {"ok": True})
+        with redirect_stderr(StringIO()) as stderr:
+            self.assertEqual(ipc_request_with_heartbeat({"type": "status"}, cfg, slow_ipc), {"ok": True})
         self.assertIn("still waiting for Telegram approval", stderr.getvalue())
 
 

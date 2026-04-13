@@ -1,25 +1,15 @@
 from __future__ import annotations
 
 import argparse
-import json
-import os
-import socket
-import subprocess
 import sys
-import threading
-import time
 from pathlib import Path
-from typing import Any
 
-from sudo_request.app.cli.cleanup import close_request_with_diagnostics
 from sudo_request.app.cli.doctor import command_doctor
-from sudo_request.app.cli.install import install_daemon, install_tool, uninstall_daemon, uninstall_tool, update_itself_command
-from sudo_request.app.cli.output import print_daemon_unreachable, print_error, print_error_response
+from sudo_request.app.cli.install import install_daemon, install_tool, uninstall_daemon, uninstall_tool
+from sudo_request.app.cli.ipc_commands import command_cancel, command_cleanup, ipc_request
+from sudo_request.app.cli.run import command_run, command_update_itself
 from sudo_request.app.cli.status import command_status
-from sudo_request.lib.audit import append_jsonl_best_effort, user_audit_path
-from sudo_request.lib.config import Config, load_config
-from sudo_request.lib.constants import BIN_PATH, EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK, SOCKET_PATH
-from sudo_request.lib.ipc import recv_json_line, send_json_line
+from sudo_request.lib.constants import BIN_PATH
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -55,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "status":
         return command_status(ipc_request, json_output=args.json)
     if args.command == "cancel":
-        return print_ipc({"type": "cancel", "request_id": args.request_id})
+        return command_cancel(args.request_id, ipc_request)
     if args.command == "doctor":
         return command_doctor(ipc_request)
     if args.command == "daemon":
@@ -76,121 +66,5 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "update-itself":
         return command_update_itself(args.source, args.window_seconds)
     if args.command == "cleanup":
-        if os.geteuid() == 0:
-            from sudo_request.lib.security.sudoers import cleanup_broad_rule
-
-            cleanup_broad_rule()
-            print("cleanup complete")
-            return 0
-        return print_ipc({"type": "cleanup"})
+        return command_cleanup(ipc_request)
     return 2
-
-
-def command_update_itself(source: str | None = None, window_seconds: int = 30) -> int:
-    try:
-        cmd = update_itself_command(source)
-    except Exception as exc:
-        print_error("policy_block", exit_code=EXIT_POLICY_BLOCK, action="update_itself", message=str(exc))
-        return EXIT_POLICY_BLOCK
-    return command_run(cmd, window_seconds)
-
-
-def command_run(cmd: list[str], window_seconds: int | None = None) -> int:
-    if not cmd:
-        print_error("policy_block", exit_code=EXIT_POLICY_BLOCK, action="run", message="sudo-request run requires a command after --")
-        return EXIT_POLICY_BLOCK
-    if window_seconds is not None and window_seconds <= 0:
-        print_error("policy_block", exit_code=EXIT_POLICY_BLOCK, action="run", message="--window-seconds must be positive")
-        return EXIT_POLICY_BLOCK
-    subprocess.run(["/usr/bin/sudo", "-k"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    cfg = load_config(Path.home())
-    request = {
-        "type": "run_request",
-        "argv": cmd,
-        "cwd": os.getcwd(),
-        "path": os.environ.get("PATH", os.defpath),
-    }
-    if window_seconds is not None:
-        request["window_seconds"] = window_seconds
-    print("sudo-request: approval requested; waiting for Telegram approval...", file=sys.stderr)
-    try:
-        response = ipc_request_with_heartbeat(request, cfg)
-    except Exception as exc:
-        return print_daemon_unreachable(exc, action="run_request")
-
-    if not response.get("ok"):
-        return print_error_response(response, fallback_exit_code=EXIT_DAEMON_FAILURE, action="run_request")
-
-    request_id = str(response["request_id"])
-    payload_hash = str(response["payload_hash"])
-    print(f"sudo-request: approved; broad sudo window open for up to {response.get('window_seconds')}s", file=sys.stderr)
-    append_jsonl_best_effort(user_audit_path(Path.home()), "command_started", {"request_id": request_id, "argv": cmd})
-    print("sudo-request: running command...", file=sys.stderr)
-    send_lifecycle_event_best_effort(request_id, payload_hash, "running")
-    returncode = EXIT_DAEMON_FAILURE
-    command_completed = False
-    try:
-        proc = subprocess.run(cmd)
-        returncode = int(proc.returncode)
-        command_completed = True
-        return returncode
-    finally:
-        print(f"sudo-request: command exited with code {returncode}", file=sys.stderr)
-        send_lifecycle_event_best_effort(request_id, payload_hash, "done" if command_completed else "failed", returncode)
-        close_request_with_diagnostics(request_id, ipc_request)
-        subprocess.run(["/usr/bin/sudo", "-k"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        append_jsonl_best_effort(user_audit_path(Path.home()), "command_finished", {"request_id": request_id, "exit_code": returncode})
-
-
-def ipc_request(message: dict[str, Any]) -> dict[str, Any]:
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-        sock.connect(str(SOCKET_PATH))
-        send_json_line(sock, message)
-        return recv_json_line(sock.makefile("r", encoding="utf-8"))
-
-
-def send_lifecycle_event_best_effort(request_id: str, payload_hash: str, phase: str, exit_code: int | None = None) -> None:
-    message: dict[str, Any] = {
-        "type": "lifecycle_event",
-        "request_id": request_id,
-        "payload_hash": payload_hash,
-        "phase": phase,
-    }
-    if exit_code is not None:
-        message["exit_code"] = exit_code
-    try:
-        ipc_request(message)
-    except Exception:
-        return
-
-
-def ipc_request_with_heartbeat(message: dict[str, Any], cfg: Config) -> dict[str, Any]:
-    done = threading.Event()
-    result: dict[str, Any] = {}
-    error: list[BaseException] = []
-
-    def worker() -> None:
-        try:
-            result.update(ipc_request(message))
-        except BaseException as exc:
-            error.append(exc)
-        finally:
-            done.set()
-
-    thread = threading.Thread(target=worker, daemon=True)
-    thread.start()
-    while not done.wait(cfg.approval_wait_heartbeat_seconds):
-        print("sudo-request: still waiting for Telegram approval...", file=sys.stderr)
-    thread.join()
-    if error:
-        raise error[0]
-    return result
-
-
-def print_ipc(message: dict[str, Any]) -> int:
-    try:
-        response = ipc_request(message)
-    except Exception as exc:
-        return print_daemon_unreachable(exc, action=str(message.get("type") or "ipc"))
-    print(json.dumps(response, indent=2, sort_keys=True))
-    return 0 if response.get("ok") else int(response.get("exit_code", EXIT_POLICY_BLOCK))
