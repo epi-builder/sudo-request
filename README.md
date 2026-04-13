@@ -51,6 +51,19 @@ sudo-request doctor
 sudo-request run -- /bin/echo ok
 ```
 
+Reinstall from the checkout when the installed copy should be updated:
+
+```bash
+sudo-request run --window-seconds 30 -- /usr/bin/sudo /opt/homebrew/bin/uv run sudo-request install
+```
+
+During reinstall the daemon may restart before the CLI can send its final close
+request. If cleanup already happened, this is reported as:
+
+```text
+sudo-request: cleanup request could not reach daemon, but broad sudo rule is not installed
+```
+
 Uninstall:
 
 ```bash
@@ -88,3 +101,17 @@ Request a custom window within the configured max:
 ```bash
 sudo-request run --window-seconds 120 -- /usr/bin/sudo /usr/bin/id -u
 ```
+
+## Project Layout
+
+```text
+src/sudo_request/
+  app/        CLI-side install and cleanup helpers
+  approval/   Telegram approval client and message formatting
+  security/   payload hashing, command validation, sudoers drop-in handling
+  cli.py      argparse entrypoint and user command execution
+  daemon.py   root daemon IPC server and broad window lifecycle
+```
+
+Tests follow the same responsibility split with `test_app_*`,
+`test_approval_*`, and `test_security_*` files.

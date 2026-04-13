@@ -15,10 +15,6 @@ class Config:
     broad_window_seconds_default: int = 30
     broad_window_seconds_max: int = 300
 
-    @property
-    def broad_window_seconds(self) -> int:
-        return self.broad_window_seconds_default
-
 
 def config_path(home: Path) -> Path:
     return home / ".config" / "sudo-request" / "config.toml"
@@ -50,9 +46,8 @@ def load_config(home: Path) -> Config:
         raise ValueError("telegram_allowed_user_ids must be a list of integers")
     approval_timeout = int(raw.get("approval_timeout_seconds", base.approval_timeout_seconds))
     heartbeat = int(raw.get("approval_wait_heartbeat_seconds", base.approval_wait_heartbeat_seconds))
-    legacy_window = raw.get("broad_window_seconds")
-    window_default = int(raw.get("broad_window_seconds_default", legacy_window if legacy_window is not None else base.broad_window_seconds_default))
-    window_max = int(raw.get("broad_window_seconds_max", max(window_default, base.broad_window_seconds_max)))
+    window_default = int(raw.get("broad_window_seconds_default", base.broad_window_seconds_default))
+    window_max = int(raw.get("broad_window_seconds_max", base.broad_window_seconds_max))
     if approval_timeout <= 0:
         raise ValueError("approval_timeout_seconds must be positive")
     if heartbeat <= 0:
