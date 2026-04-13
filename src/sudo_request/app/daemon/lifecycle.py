@@ -32,6 +32,7 @@ class RequestLifecycle:
     expires_at: int
     requested_window_seconds: int
     max_window_seconds: int
+    window_expires_at: int | None = None
     phase: RequestPhase = RequestPhase.PENDING_APPROVAL
     approval_messages: list[dict[str, int]] = field(default_factory=list)
     exit_code: int | None = None
@@ -69,6 +70,7 @@ class RequestLifecycle:
             "expires_at": self.expires_at,
             "requested_window_seconds": self.requested_window_seconds,
             "max_window_seconds": self.max_window_seconds,
+            "window_expires_at": self.window_expires_at,
             "approval_messages": self.approval_messages,
             "exit_code": self.exit_code,
         }

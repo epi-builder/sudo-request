@@ -14,6 +14,7 @@ from typing import Any
 from sudo_request.app.cli.cleanup import close_request_with_diagnostics
 from sudo_request.app.cli.doctor import command_doctor
 from sudo_request.app.cli.install import install_daemon, install_tool, uninstall_daemon, uninstall_tool, update_itself_command
+from sudo_request.app.cli.status import command_status
 from sudo_request.lib.audit import append_jsonl_best_effort, user_audit_path
 from sudo_request.lib.config import Config, load_config
 from sudo_request.lib.constants import BIN_PATH, EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK, SOCKET_PATH
@@ -28,7 +29,8 @@ def main(argv: list[str] | None = None) -> int:
     run_p.add_argument("--window-seconds", type=int, help="requested broad sudo window length; daemon enforces configured max")
     run_p.add_argument("cmd", nargs=argparse.REMAINDER)
 
-    sub.add_parser("status")
+    status_p = sub.add_parser("status")
+    status_p.add_argument("--json", action="store_true", help="print raw daemon status JSON")
     cancel_p = sub.add_parser("cancel")
     cancel_p.add_argument("request_id")
     sub.add_parser("doctor")
@@ -50,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
             cmd = cmd[1:]
         return command_run(cmd, args.window_seconds)
     if args.command == "status":
-        return print_ipc({"type": "status"})
+        return command_status(ipc_request, json_output=args.json)
     if args.command == "cancel":
         return print_ipc({"type": "cancel", "request_id": args.request_id})
     if args.command == "doctor":

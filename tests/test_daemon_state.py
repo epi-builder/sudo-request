@@ -47,6 +47,29 @@ class DaemonStateTests(unittest.TestCase):
         self.assertEqual(status["active_request"]["phase"], "window_open")
         self.assertEqual(status["active_request"]["argv"], ["/bin/echo", "ok"])
         self.assertEqual(status["active_request"]["expires_at"], 1_776_000_000)
+        self.assertIsNone(status["active_request"]["window_expires_at"])
+
+    def test_window_expiry_updates_status_snapshot(self) -> None:
+        state = DaemonState()
+        self.assertTrue(state.begin(lifecycle("one")))
+
+        self.assertTrue(state.set_window_expires_at("one", 1_776_000_030))
+
+        status = state.status()
+        self.assertEqual(status["active_request"]["window_expires_at"], 1_776_000_030)
+
+    def test_handle_status_includes_daemon_pid(self) -> None:
+        state = DaemonState()
+        handler = server.RequestHandler.__new__(server.RequestHandler)
+
+        with patch.object(server, "STATE", state):
+            with patch.object(server, "DROPIN_PATH") as dropin_path:
+                with patch.object(server.os, "getpid", return_value=123):
+                    dropin_path.exists.return_value = False
+                    result = server.RequestHandler.handle_status(handler)
+
+        self.assertEqual(result["daemon_pid"], 123)
+        self.assertFalse(result["dropin_exists"])
 
     def test_notification_payload_returns_active_request_payload(self) -> None:
         state = DaemonState()

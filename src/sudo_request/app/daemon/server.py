@@ -51,6 +51,13 @@ class DaemonState:
                 self.active_request.exit_code = exit_code
             return True
 
+    def set_window_expires_at(self, request_id: str, window_expires_at: int) -> bool:
+        with self.lock:
+            if self.active_request is None or self.active_request.request_id != request_id:
+                return False
+            self.active_request.window_expires_at = window_expires_at
+            return True
+
     def set_approval_messages(self, request_id: str, approval_messages: list[dict[str, int]]) -> bool:
         with self.lock:
             if self.active_request is None or self.active_request.request_id != request_id:
@@ -203,6 +210,7 @@ class RequestHandler(socketserver.StreamRequestHandler):
 
             STATE.set_phase(request_id, RequestPhase.APPROVED)
             install_broad_rule(user)
+            STATE.set_window_expires_at(request_id, int(time.time()) + window_seconds)
             STATE.set_phase(request_id, RequestPhase.WINDOW_OPEN)
             timer = threading.Timer(window_seconds, watchdog_cleanup, args=(request_id,))
             timer.daemon = True
@@ -349,7 +357,7 @@ class RequestHandler(socketserver.StreamRequestHandler):
                 )
 
     def handle_status(self) -> dict[str, Any]:
-        return {"ok": True, "status": "ok", **STATE.status(), "dropin_exists": DROPIN_PATH.exists()}
+        return {"ok": True, "status": "ok", "daemon_pid": os.getpid(), **STATE.status(), "dropin_exists": DROPIN_PATH.exists()}
 
     def handle_cancel(self, message: dict[str, Any]) -> dict[str, Any]:
         uid = peer_uid(self.request)
