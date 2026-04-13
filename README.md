@@ -36,6 +36,9 @@ sudo sudo-request cleanup
 
 ## Install
 
+`install` is the low-level root operation. `update-itself` is the normal
+approval-based way to refresh an installed copy from a source checkout.
+
 From this source checkout:
 
 ```bash
