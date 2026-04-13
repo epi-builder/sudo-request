@@ -52,6 +52,24 @@ def project_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+def resolve_update_source(source: str | None = None) -> Path:
+    source_root = Path(source).expanduser().resolve(strict=False) if source else project_root()
+    if source_root == INSTALL_PREFIX:
+        raise ValueError("update-itself needs a source checkout; run from the repo or pass --source")
+    if not (source_root / "pyproject.toml").exists():
+        raise ValueError(f"source checkout is missing pyproject.toml: {source_root}")
+    if not (source_root / "src" / "sudo_request").is_dir():
+        raise ValueError(f"source checkout is missing src/sudo_request: {source_root}")
+    return source_root
+
+
+def update_itself_command(source: str | None = None, python: str | None = None) -> list[str]:
+    source_root = resolve_update_source(source)
+    python_executable = python or sys.executable
+    env_prefix = f"PYTHONPATH={source_root / 'src'}"
+    return ["/usr/bin/sudo", "/usr/bin/env", env_prefix, python_executable, "-m", "sudo_request", "install"]
+
+
 def install_daemon(executable: Path | None = None) -> int:
     if os.geteuid() != 0:
         print("install-daemon must be run with sudo/root", file=sys.stderr)

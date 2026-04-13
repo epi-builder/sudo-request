@@ -16,7 +16,7 @@ from .app.cleanup import close_request_with_diagnostics
 from .config import Config, config_path, load_config
 from .constants import BIN_PATH, EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK, INSTALL_PREFIX, LAUNCHD_PLIST, SOCKET_PATH
 from .daemon import run_foreground
-from .app.install import install_daemon, install_tool, uninstall_daemon, uninstall_tool
+from .app.install import install_daemon, install_tool, uninstall_daemon, uninstall_tool, update_itself_command
 from .ipc import recv_json_line, send_json_line
 from .security.sudoers import cleanup_broad_rule
 
@@ -39,6 +39,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("uninstall")
     sub.add_parser("install-daemon")
     sub.add_parser("uninstall-daemon")
+    update_p = sub.add_parser("update-itself")
+    update_p.add_argument("--source", help="source checkout to install from; required when running from an installed copy")
+    update_p.add_argument("--window-seconds", type=int, default=30, help="requested broad sudo window length for the self-update")
     sub.add_parser("cleanup")
 
     args = parser.parse_args(argv)
@@ -66,6 +69,8 @@ def main(argv: list[str] | None = None) -> int:
         return install_daemon(BIN_PATH if BIN_PATH.exists() else Path(sys.argv[0]).resolve(strict=False))
     if args.command == "uninstall-daemon":
         return uninstall_daemon()
+    if args.command == "update-itself":
+        return command_update_itself(args.source, args.window_seconds)
     if args.command == "cleanup":
         if os.geteuid() == 0:
             cleanup_broad_rule()
@@ -73,6 +78,15 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         return print_ipc({"type": "cleanup"})
     return 2
+
+
+def command_update_itself(source: str | None = None, window_seconds: int = 30) -> int:
+    try:
+        cmd = update_itself_command(source)
+    except Exception as exc:
+        print(f"sudo-request: update-itself: {exc}", file=sys.stderr)
+        return EXIT_POLICY_BLOCK
+    return command_run(cmd, window_seconds)
 
 
 def command_run(cmd: list[str], window_seconds: int | None = None) -> int:

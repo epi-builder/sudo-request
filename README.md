@@ -26,6 +26,7 @@ sudo-request status
 sudo-request cancel <request-id>
 sudo-request doctor
 sudo-request daemon --foreground
+sudo-request update-itself [--source <checkout>] [--window-seconds N]
 sudo sudo-request install
 sudo sudo-request uninstall
 sudo sudo-request install-daemon
@@ -54,7 +55,14 @@ sudo-request run -- /bin/echo ok
 Reinstall from the checkout when the installed copy should be updated:
 
 ```bash
-sudo-request run --window-seconds 30 -- /usr/bin/sudo /opt/homebrew/bin/uv run sudo-request install
+uv run sudo-request update-itself
+```
+
+If running from the installed command instead of the source checkout, pass the
+checkout explicitly:
+
+```bash
+sudo-request update-itself --source /Users/epikem/dev/tmp/codex-test/sudo-request
 ```
 
 During reinstall the daemon may restart before the CLI can send its final close
