@@ -94,6 +94,7 @@ Put the Telegram bot token in:
 ```bash
 uv run sudo-request doctor
 uv run python -m unittest discover -s tests
+scripts/e2e-smoke.sh
 ```
 
 Request a custom window within the configured max:
@@ -101,6 +102,16 @@ Request a custom window within the configured max:
 ```bash
 sudo-request run --window-seconds 120 -- /usr/bin/sudo /usr/bin/id -u
 ```
+
+Run the root/Telegram manual e2e after installing the daemon:
+
+```bash
+scripts/e2e-root-manual.sh
+```
+
+The manual e2e asks for Telegram approval, verifies `/usr/bin/sudo /usr/bin/id -u`
+returns `0` during the approved run, and verifies passwordless sudo is closed
+after cleanup.
 
 ## Project Layout
 
