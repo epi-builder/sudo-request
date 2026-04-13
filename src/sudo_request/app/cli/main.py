@@ -12,10 +12,11 @@ from pathlib import Path
 from typing import Any
 
 from sudo_request.app.cli.cleanup import close_request_with_diagnostics
+from sudo_request.app.cli.doctor import command_doctor
 from sudo_request.app.cli.install import install_daemon, install_tool, uninstall_daemon, uninstall_tool, update_itself_command
 from sudo_request.lib.audit import append_jsonl_best_effort, user_audit_path
-from sudo_request.lib.config import Config, config_path, load_config
-from sudo_request.lib.constants import BIN_PATH, EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK, INSTALL_PREFIX, LAUNCHD_PLIST, SOCKET_PATH
+from sudo_request.lib.config import Config, load_config
+from sudo_request.lib.constants import BIN_PATH, EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK, SOCKET_PATH
 from sudo_request.lib.ipc import recv_json_line, send_json_line
 
 
@@ -53,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "cancel":
         return print_ipc({"type": "cancel", "request_id": args.request_id})
     if args.command == "doctor":
-        return command_doctor()
+        return command_doctor(ipc_request)
     if args.command == "daemon":
         if not args.foreground:
             print("daemon currently supports --foreground only", file=sys.stderr)
@@ -193,31 +194,3 @@ def print_ipc(message: dict[str, Any]) -> int:
         return EXIT_DAEMON_FAILURE
     print(json.dumps(response, indent=2, sort_keys=True))
     return 0 if response.get("ok") else int(response.get("exit_code", EXIT_POLICY_BLOCK))
-
-
-def command_doctor() -> int:
-    home = Path.home()
-    print(f"config: {config_path(home)}")
-    try:
-        cfg = load_config(home)
-        print("config: ok")
-        print(f"telegram token file: {cfg.telegram_bot_token_file} exists={cfg.telegram_bot_token_file.exists()}")
-        print(f"telegram allowed users: {len(cfg.telegram_allowed_user_ids)} configured")
-        print(f"approval timeout: {cfg.approval_timeout_seconds}s")
-        print(f"approval wait heartbeat: {cfg.approval_wait_heartbeat_seconds}s")
-        print(f"broad window default: {cfg.broad_window_seconds_default}s")
-        print(f"broad window max: {cfg.broad_window_seconds_max}s")
-    except Exception as exc:
-        print(f"config: error: {exc}")
-    print(f"daemon socket: {SOCKET_PATH} exists={SOCKET_PATH.exists()}")
-    print(f"launchd plist: {LAUNCHD_PLIST} exists={LAUNCHD_PLIST.exists()}")
-    print(f"installed prefix: {INSTALL_PREFIX} exists={INSTALL_PREFIX.exists()}")
-    print(f"PATH wrapper: {BIN_PATH} exists={BIN_PATH.exists()}")
-    print(f"PATH contains /usr/local/bin: {'/usr/local/bin' in os.environ.get('PATH', '').split(os.pathsep)}")
-    print(f"sudoers.d: /private/etc/sudoers.d exists={Path('/private/etc/sudoers.d').exists()}")
-    try:
-        response = ipc_request({"type": "status"})
-        print(f"daemon status: {json.dumps(response, sort_keys=True)}")
-    except Exception as exc:
-        print(f"daemon status: unavailable: {exc}")
-    return 0
