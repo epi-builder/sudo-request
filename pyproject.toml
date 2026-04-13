@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 dependencies = []
 
 [project.scripts]
-sudo-request = "sudo_request.cli:main"
+sudo-request = "sudo_request.app.cli.main:main"
 
 [build-system]
 requires = ["uv_build>=0.11.0,<0.12.0"]

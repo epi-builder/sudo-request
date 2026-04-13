@@ -11,7 +11,7 @@
   callback data 파싱, request id/hash/nonce 검증, allowed user 검증, one-time decision 결과 모델을 Telegram HTTP transport에서 분리한다.
   완료 기준은 `telegram.py`가 네트워크 I/O와 Telegram API 호출에 집중하고, callback 검증 단위 테스트가 `approval/decision.py`를 직접 검증하는 것이다.
 
-- [ ] 배포 애플리케이션 경계를 `app/cli`와 `app/daemon`으로 분리
+- [x] 배포 애플리케이션 경계를 `app/cli`와 `app/daemon`으로 분리
   이 도구는 user-level CLI와 root-level daemon 두 실행면을 갖는다. CLI 진입점과 daemon 진입점을 별도 패키지로 나누어 루트 권한으로 실행되는 코드 범위를 더 명확하게 만든다.
   완료 기준은 `sudo_request/cli.py`와 `sudo_request/daemon.py`가 얇은 호환 shim이거나 제거 가능한 상태가 되고, 실제 구현은 `app/cli/...`, `app/daemon/...` 아래에 위치하는 것이다.
 

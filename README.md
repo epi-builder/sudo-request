@@ -135,11 +135,15 @@ after cleanup.
 
 ```text
 src/sudo_request/
-  app/        CLI-side install and cleanup helpers
-  approval/   Telegram approval client and message formatting
-  security/   payload hashing, command validation, sudoers drop-in handling
-  cli.py      argparse entrypoint and user command execution
-  daemon.py   root daemon IPC server and broad window lifecycle
+  app/
+    cli/       user-level CLI entrypoint and command flow
+    daemon/    root-level IPC server and broad window lifecycle
+    cleanup.py CLI-side cleanup diagnostics
+    install.py install, uninstall, and self-update helpers
+  approval/    Telegram approval client, decision, and message formatting
+  security/    payload hashing, command validation, sudoers drop-in handling
+  cli.py       compatibility shim for the CLI app
+  daemon.py    compatibility shim for the daemon app
 ```
 
 Tests follow the same responsibility split with `test_app_*`,
