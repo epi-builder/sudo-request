@@ -18,6 +18,7 @@ class ConfigTests(unittest.TestCase):
                     'telegram_bot_token_file = "~/.config/sudo-request/token"',
                     "telegram_allowed_user_ids = [123, 456]",
                     "approval_timeout_seconds = 12",
+                    "approval_wait_heartbeat_seconds = 3",
                     "broad_window_seconds_default = 7",
                     "broad_window_seconds_max = 20",
                 ]),
@@ -27,6 +28,7 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(cfg.telegram_bot_token_file, cfg_dir / "token")
             self.assertEqual(cfg.telegram_allowed_user_ids, [123, 456])
             self.assertEqual(cfg.approval_timeout_seconds, 12)
+            self.assertEqual(cfg.approval_wait_heartbeat_seconds, 3)
             self.assertEqual(cfg.broad_window_seconds_default, 7)
             self.assertEqual(cfg.broad_window_seconds_max, 20)
             self.assertEqual(cfg.broad_window_seconds, 7)

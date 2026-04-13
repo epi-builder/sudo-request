@@ -40,19 +40,7 @@ class TelegramClient:
         return raw
 
     def send_approval(self, chat_id: int, payload: dict[str, Any]) -> int:
-        text = (
-            "sudo-request broad sudo window\n\n"
-            f"Host: {payload['host']}\n"
-            f"User: {payload['user']} uid={payload['uid']}\n"
-            f"Working directory: {payload['cwd']}\n"
-            f"Requested command: {format_argv(payload['argv'])}\n"
-            f"Resolved executable: {payload['resolved_executable']}\n"
-            f"Parent process: {payload['parent_process']}\n"
-            f"Requested sudo window: {payload['requested_window_seconds']}s (max {payload['max_window_seconds']}s)\n"
-            f"Expires at: {payload['expires_at']}\n"
-            f"SHA256 payload hash: {payload['payload_hash']}\n\n"
-            "WARNING: while approved, this local user can run passwordless sudo from any process."
-        )
+        text = approval_message_text(payload, "PENDING")
         nonce = payload["nonce"]
         request_id = payload["request_id"]
         digest = payload["payload_hash"]
@@ -69,6 +57,22 @@ class TelegramClient:
 
     def answer_callback(self, callback_id: str, text: str) -> None:
         self._post("answerCallbackQuery", {"callback_query_id": callback_id, "text": text}, timeout=10)
+
+    def mark_decision(self, callback: dict[str, Any], payload: dict[str, Any], status: str) -> None:
+        message = callback.get("message") or {}
+        chat = message.get("chat") or {}
+        chat_id = chat.get("id")
+        message_id = message.get("message_id")
+        if chat_id is None or message_id is None:
+            return
+        try:
+            self._post(
+                "editMessageText",
+                {"chat_id": chat_id, "message_id": message_id, "text": approval_message_text(payload, status), "reply_markup": {"inline_keyboard": []}},
+                timeout=10,
+            )
+        except Exception:
+            return
 
     def wait_for_decision(self, payload: dict[str, Any], allowed_user_ids: list[int], timeout_seconds: int) -> ApprovalResult:
         deadline = time.time() + timeout_seconds
@@ -99,11 +103,29 @@ class TelegramClient:
                     continue
                 if action == "a":
                     self.answer_callback(str(callback["id"]), "Approved")
+                    self.mark_decision(callback, payload, "APPROVED")
                     return ApprovalResult("approved", user_id)
                 if action == "d":
                     self.answer_callback(str(callback["id"]), "Denied")
+                    self.mark_decision(callback, payload, "DENIED")
                     return ApprovalResult("denied", user_id)
         return ApprovalResult("timeout", None, "approval timed out")
+
+
+def approval_message_text(payload: dict[str, Any], status: str) -> str:
+    return (
+        f"sudo-request broad sudo window [{status}]\n\n"
+        f"Host: {payload['host']}\n"
+        f"User: {payload['user']} uid={payload['uid']}\n"
+        f"Working directory: {payload['cwd']}\n"
+        f"Requested command: {format_argv(payload['argv'])}\n"
+        f"Resolved executable: {payload['resolved_executable']}\n"
+        f"Parent process: {payload['parent_process']}\n"
+        f"Requested sudo window: {payload['requested_window_seconds']}s (max {payload['max_window_seconds']}s)\n"
+        f"Expires at: {payload['expires_at']}\n"
+        f"SHA256 payload hash: {payload['payload_hash']}\n\n"
+        "WARNING: while approved, this local user can run passwordless sudo from any process."
+    )
 
 
 def format_argv(argv: list[str]) -> str:

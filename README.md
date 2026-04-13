@@ -65,6 +65,7 @@ Create `~/.config/sudo-request/config.toml`:
 telegram_bot_token_file = "~/.config/sudo-request/telegram_bot_token"
 telegram_allowed_user_ids = [123456789]
 approval_timeout_seconds = 90
+approval_wait_heartbeat_seconds = 10
 broad_window_seconds_default = 30
 broad_window_seconds_max = 300
 ```

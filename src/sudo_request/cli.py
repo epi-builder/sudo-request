@@ -8,11 +8,13 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
 from .audit import append_jsonl_best_effort, user_audit_path
-from .config import config_path, load_config
+from .config import Config, config_path, load_config
 from .constants import BIN_PATH, EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK, INSTALL_PREFIX, LAUNCHD_PLIST, SOCKET_PATH
 from .daemon import run_foreground
 from .ipc import recv_json_line, send_json_line
@@ -81,6 +83,7 @@ def command_run(cmd: list[str], window_seconds: int | None = None) -> int:
         print("sudo-request: --window-seconds must be positive", file=sys.stderr)
         return EXIT_POLICY_BLOCK
     subprocess.run(["/usr/bin/sudo", "-k"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    cfg = load_config(Path.home())
     request = {
         "type": "run_request",
         "argv": cmd,
@@ -91,7 +94,7 @@ def command_run(cmd: list[str], window_seconds: int | None = None) -> int:
         request["window_seconds"] = window_seconds
     print("sudo-request: approval requested; waiting for Telegram approval...", file=sys.stderr)
     try:
-        response = ipc_request(request)
+        response = ipc_request_with_heartbeat(request, cfg)
     except Exception as exc:
         print(f"sudo-request: daemon request failed: {exc}", file=sys.stderr)
         return EXIT_DAEMON_FAILURE
@@ -124,6 +127,29 @@ def ipc_request(message: dict[str, Any]) -> dict[str, Any]:
         return recv_json_line(sock.makefile("r", encoding="utf-8"))
 
 
+def ipc_request_with_heartbeat(message: dict[str, Any], cfg: Config) -> dict[str, Any]:
+    done = threading.Event()
+    result: dict[str, Any] = {}
+    error: list[BaseException] = []
+
+    def worker() -> None:
+        try:
+            result.update(ipc_request(message))
+        except BaseException as exc:
+            error.append(exc)
+        finally:
+            done.set()
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    while not done.wait(cfg.approval_wait_heartbeat_seconds):
+        print("sudo-request: still waiting for Telegram approval...", file=sys.stderr)
+    thread.join()
+    if error:
+        raise error[0]
+    return result
+
+
 def print_ipc(message: dict[str, Any]) -> int:
     try:
         response = ipc_request(message)
@@ -143,6 +169,7 @@ def command_doctor() -> int:
         print(f"telegram token file: {cfg.telegram_bot_token_file} exists={cfg.telegram_bot_token_file.exists()}")
         print(f"telegram allowed users: {len(cfg.telegram_allowed_user_ids)} configured")
         print(f"approval timeout: {cfg.approval_timeout_seconds}s")
+        print(f"approval wait heartbeat: {cfg.approval_wait_heartbeat_seconds}s")
         print(f"broad window default: {cfg.broad_window_seconds_default}s")
         print(f"broad window max: {cfg.broad_window_seconds_max}s")
     except Exception as exc:
