@@ -8,10 +8,11 @@
 - [x] cleanup 실패 또는 broad sudo rule 잔존 시 Telegram critical 알림 전송
 - [x] `sudo-request status`에 active command, phase, window expires_at local time, daemon pid 등 실시간 상태 확장
 - [x] `sudo-request doctor`에 socket/drop-in/launchd 파일 owner/mode 권한 검사 추가
+- [x] daemon active request state를 디스크에 저장해 restart/update 이후 cleanup context와 Telegram lifecycle status 복구
 - [ ] long-running command 실행 중 선택적 heartbeat 출력 지원
 - [ ] timeout/deny/daemon failure stderr 메시지 포맷을 agent가 읽기 쉽도록 더 일관화
 - [ ] 긴 `--window-seconds` 요청이 max에 가까울 때 Telegram 승인 메시지에 추가 경고 표시
-- [ ] self-management/install 명령처럼 `/usr/bin/sudo ... sudo-request install` 형태의 요청을 Telegram에서 더 명확히 표시
+- [ ] self-management/install 명령처럼 `/usr/bin/sudo /usr/bin/env ... python -m sudo_request install` 형태의 요청을 Telegram에서 더 명확히 표시
 
 리팩토링:
 - [x] Telegram 상태 업데이트 API를 `send approval`, `mark status`, `wait decision` 책임으로 더 명시적으로 정리
@@ -31,4 +32,4 @@
 - [ ] `status`, `cancel`, `cleanup` IPC command wrappers를 `app/status.py` 또는 `app/ipc_commands.py`로 분리
 - [ ] install/update/self-management 로직을 `app/install_commands.py`로 분리
 - [ ] 테스트 공통 fixture/helper를 `tests/helpers.py`로 분리
-- [ ] README, docs, audit-memo, sudo-request-run skill의 실행 경로와 책임 설명 동기화
+- [x] README, docs, audit-memo, sudo-request-run skill의 실행 경로와 책임 설명 동기화

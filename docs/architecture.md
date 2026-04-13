@@ -41,3 +41,10 @@ The user-level CLI asks the root daemon for approval, then runs the original
 command as the local user. The root daemon verifies Telegram approval and opens
 the temporary broad sudoers window.
 
+## Runtime State
+
+The daemon persists active request lifecycle state under `/var/run/sudo-request`.
+Startup recovery keeps requests that reached an opened sudo window, which lets a
+restarted daemon recover command metadata, Telegram approval message ids, and
+cleanup context. Requests that never reached an opened window are discarded
+because their approval wait cannot be resumed.

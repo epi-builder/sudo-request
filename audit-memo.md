@@ -83,13 +83,18 @@ Current mitigations:
   broad rule may remain installed.
 - `doctor` checks owner/mode/kind for the sudoers directory and broad rule
   drop-in.
+- Active request state is persisted under the daemon runtime directory, so a
+  restarted daemon can recover cleanup context and accept later lifecycle
+  events from the user CLI.
 
 Residual risk:
 - Filesystem/permission/launchd failure could prevent cleanup.
 - Telegram critical alerts are best-effort and can fail if the bot token,
   network, or configured chats are unavailable.
-- Daemon restarts can still lose in-memory request context until active request
-  state is persisted across daemon lifetimes.
+- The persisted state file is diagnostic/recovery state, not a security
+  boundary; root during the broad window can tamper with it.
+- If a daemon restart happens before the sudo window opens, that pending
+  approval cannot be resumed and is discarded on startup.
 
 4. Daemon IPC misuse by local processes
 
@@ -154,21 +159,24 @@ cleanup behavior.
 
 Current mitigations:
 - Direct recursive `sudo-request` command is rejected by payload validation.
-- Self-reinstall is performed as `/usr/bin/sudo ... uv run sudo-request install`,
-  so the approved command is explicit.
+- Self-reinstall is routed through `update-itself`, which approves an explicit
+  `/usr/bin/sudo /usr/bin/env PYTHONPATH=... python -m sudo_request install`
+  command.
 - Cleanup diagnostics tolerate daemon restart only when the broad rule is gone.
 - `status` reports active request phase, command metadata, requested window,
   window expiry, daemon pid, and whether the broad sudo rule exists.
 - Telegram approval messages are updated to `[RUNNING]`, `[DONE exit=N]`, or
   failure statuses when lifecycle events reach the daemon.
+- Active request state persists across daemon restart/update after the sudo
+  window opens, allowing the new daemon to process later `[DONE exit=N]` or
+  failure lifecycle updates from the user CLI.
 
 Residual risk:
 - Self-reinstall still restarts the daemon during an active window.
 - A failed install halfway through could leave daemon availability degraded,
   though startup cleanup and status checks reduce stale-rule risk.
-- Because active request state is still in memory only, daemon restart during
-  an active command can leave Telegram with stale lifecycle status even when the
-  sudoers drop-in has been cleaned up.
+- If the daemon is unavailable when the CLI sends best-effort lifecycle events,
+  Telegram may still miss the final status update.
 
 8. Audit log tampering or loss
 
@@ -208,16 +216,16 @@ Completed since the original audit:
   plist, install paths, sudoers directory, and broad rule drop-in.
 - Telegram `[RUNNING]`, `[DONE exit=N]`, and failure status updates for
   lifecycle visibility.
+- Persisted daemon active request state for restart/update recovery after the
+  sudo window opens.
 
 Remaining highest priority mitigations:
 
-1. Persist daemon active request state so daemon restart/update can recover
-   cleanup context and Telegram lifecycle status.
-2. Prefer executing the resolved executable path, or explicitly document and
+1. Prefer executing the resolved executable path, or explicitly document and
    validate that the original argv execution can differ from the displayed path.
-3. Consider tightening socket permissions if multi-user local scenarios matter.
-4. Add rate limiting or backoff for repeated requests.
-5. Make timeout/deny/daemon failure stderr messages more consistent for agents.
+2. Consider tightening socket permissions if multi-user local scenarios matter.
+3. Add rate limiting or backoff for repeated requests.
+4. Make timeout/deny/daemon failure stderr messages more consistent for agents.
 
 ## Non-Goals for v1
 

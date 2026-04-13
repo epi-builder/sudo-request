@@ -5,6 +5,7 @@ from pathlib import Path
 APP_NAME = "sudo-request"
 SOCKET_DIR = Path("/var/run/sudo-request")
 SOCKET_PATH = SOCKET_DIR / "sudo-request.sock"
+ACTIVE_STATE_PATH = SOCKET_DIR / "active-request.json"
 DROPIN_DIR = Path("/private/etc/sudoers.d")
 DROPIN_PATH = DROPIN_DIR / "sudo-request-broad"
 DAEMON_LOG = Path("/Library/Logs/sudo-request/daemon-audit.jsonl")

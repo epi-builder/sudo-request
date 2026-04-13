@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 
 from sudo_request.app.daemon import server
@@ -57,6 +58,50 @@ class DaemonStateTests(unittest.TestCase):
 
         status = state.status()
         self.assertEqual(status["active_request"]["window_expires_at"], 1_776_000_030)
+
+    def test_active_request_persists_to_disk_and_loads_after_restart(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            state_path = Path(tmpdir) / "active-request.json"
+            state = DaemonState(state_path)
+            active = lifecycle("one")
+
+            self.assertTrue(state.begin(active))
+            self.assertTrue(state.set_approval_messages("one", [{"chat_id": 123, "message_id": 456}]))
+            self.assertTrue(state.set_window_expires_at("one", 1_776_000_030))
+            self.assertTrue(state.set_phase("one", RequestPhase.RUNNING))
+
+            restored = DaemonState(state_path)
+            loaded = restored.load()
+
+            self.assertIsNotNone(loaded)
+            self.assertEqual(restored.active_request.request_id, "one")
+            self.assertEqual(restored.active_request.phase, RequestPhase.RUNNING)
+            self.assertEqual(restored.active_request.window_expires_at, 1_776_000_030)
+            self.assertEqual(restored.active_request.approval_messages, [{"chat_id": 123, "message_id": 456}])
+
+    def test_clear_removes_persisted_active_request(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            state_path = Path(tmpdir) / "active-request.json"
+            state = DaemonState(state_path)
+
+            self.assertTrue(state.begin(lifecycle("one")))
+            self.assertTrue(state_path.exists())
+
+            state.clear("one")
+
+            self.assertIsNone(state.active_request)
+            self.assertFalse(state_path.exists())
+
+    def test_load_discards_invalid_persisted_state(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            state_path = Path(tmpdir) / "active-request.json"
+            state_path.write_text("{not-json\n", encoding="utf-8")
+
+            state = DaemonState(state_path)
+
+            self.assertIsNone(state.load())
+            self.assertIsNone(state.active_request)
+            self.assertFalse(state_path.exists())
 
     def test_handle_status_includes_daemon_pid(self) -> None:
         state = DaemonState()
@@ -121,6 +166,73 @@ class DaemonStateTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], "request_mismatch")
         self.assertEqual(state.active_request.phase, RequestPhase.PENDING_APPROVAL)
+
+    def test_lifecycle_event_updates_restored_active_request(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            state_path = Path(tmpdir) / "active-request.json"
+            original = DaemonState(state_path)
+            active = lifecycle("one")
+            active.approval_messages = [{"chat_id": 123, "message_id": 456}]
+            self.assertTrue(original.begin(active))
+            self.assertTrue(original.set_phase("one", RequestPhase.RUNNING))
+
+            state = DaemonState(state_path)
+            self.assertIsNotNone(state.load())
+            handler = server.RequestHandler.__new__(server.RequestHandler)
+            handler.request = Mock()
+            handler.mark_approval_messages = Mock()
+
+            with patch.object(server, "STATE", state):
+                with patch.object(server, "peer_uid", return_value=501):
+                    with patch.object(server, "append_jsonl"):
+                        result = server.RequestHandler.handle_lifecycle_event(
+                            handler,
+                            {"type": "lifecycle_event", "request_id": "one", "payload_hash": "hash-one", "phase": "done", "exit_code": 0},
+                        )
+
+            self.assertEqual(result, {"ok": True, "status": "updated"})
+            self.assertEqual(state.active_request.phase, RequestPhase.DONE)
+            handler.mark_approval_messages.assert_called_once()
+            self.assertEqual(handler.mark_approval_messages.call_args.args[2], "DONE exit=0")
+
+    def test_startup_restore_discards_request_that_never_opened_window(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            state_path = Path(tmpdir) / "active-request.json"
+            original = DaemonState(state_path)
+            self.assertTrue(original.begin(lifecycle("one")))
+
+            state = DaemonState(state_path)
+            with patch.object(server, "close_broad_window", return_value=True) as cleanup:
+                with patch.object(server, "append_jsonl") as audit:
+                    restored = server.restore_active_request_state(state)
+
+            self.assertIsNone(restored)
+            self.assertIsNone(state.active_request)
+            self.assertFalse(state_path.exists())
+            cleanup.assert_called_once()
+            self.assertEqual(audit.call_args.args[1], "active_request_restore_discarded")
+
+    def test_startup_restore_reschedules_watchdog_when_cleanup_fails(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            state_path = Path(tmpdir) / "active-request.json"
+            original = DaemonState(state_path)
+            self.assertTrue(original.begin(lifecycle("one")))
+            self.assertTrue(original.set_window_expires_at("one", 1_776_000_030))
+            self.assertTrue(original.set_phase("one", RequestPhase.RUNNING))
+
+            state = DaemonState(state_path)
+            with patch.object(server, "close_broad_window", return_value=False):
+                with patch.object(server, "append_jsonl"):
+                    with patch.object(server.time, "time", return_value=1_776_000_000):
+                        with patch.object(server, "schedule_watchdog") as schedule:
+                            restored = server.restore_active_request_state(state)
+
+            self.assertIsNotNone(restored)
+            self.assertEqual(state.active_request.request_id, "one")
+            schedule.assert_called_once()
+            self.assertEqual(schedule.call_args.args[0], state)
+            self.assertEqual(schedule.call_args.args[1], "one")
+            self.assertEqual(schedule.call_args.args[2], 30)
 
     def test_mark_failed_request_best_effort_updates_existing_approval_messages(self) -> None:
         handler = server.RequestHandler.__new__(server.RequestHandler)

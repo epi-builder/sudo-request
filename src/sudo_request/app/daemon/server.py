@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import signal
 import socketserver
+import time
 from pathlib import Path
 from typing import Any
 
@@ -14,12 +15,12 @@ from sudo_request.app.daemon.watchdog import schedule_watchdog
 from sudo_request.lib.audit import append_jsonl
 from sudo_request.lib.approval.telegram import TelegramClient
 from sudo_request.lib.config import load_config, read_token
-from sudo_request.lib.constants import DAEMON_LOG, DROPIN_PATH, EXIT_DAEMON_FAILURE, SOCKET_DIR, SOCKET_PATH
+from sudo_request.lib.constants import ACTIVE_STATE_PATH, DAEMON_LOG, DROPIN_PATH, EXIT_DAEMON_FAILURE, SOCKET_DIR, SOCKET_PATH
 from sudo_request.lib.ipc import recv_json_line, send_json_line
 from sudo_request.lib.security.payload import build_payload, payload_hash, validate_username
 
 
-STATE = DaemonState()
+STATE = DaemonState(ACTIVE_STATE_PATH)
 
 
 class RequestHandler(socketserver.StreamRequestHandler):
@@ -292,6 +293,36 @@ def send_cleanup_critical_alert_from_snapshot(
     handler.send_cleanup_critical_alert_best_effort_from_snapshot(notification, source, request_id)
 
 
+def restore_active_request_state(state: DaemonState | None = None) -> RequestLifecycle | None:
+    if state is None:
+        state = STATE
+    restored_request = state.load()
+    if restored_request is not None and restored_request.window_expires_at is None:
+        append_jsonl(
+            DAEMON_LOG,
+            "active_request_restore_discarded",
+            {"request_id": restored_request.request_id, "phase": restored_request.phase.value, "reason": "window_never_opened"},
+        )
+        state.clear(restored_request.request_id)
+        restored_request = None
+    cleanup_ok = close_broad_window()
+    if restored_request is not None:
+        append_jsonl(
+            DAEMON_LOG,
+            "active_request_restored",
+            {
+                "request_id": restored_request.request_id,
+                "phase": restored_request.phase.value,
+                "window_expires_at": restored_request.window_expires_at,
+                "startup_cleanup_ok": cleanup_ok,
+            },
+        )
+        if not cleanup_ok and restored_request.window_expires_at is not None:
+            remaining_seconds = max(1, restored_request.window_expires_at - int(time.time()))
+            schedule_watchdog(state, restored_request.request_id, remaining_seconds, send_cleanup_critical_alert_from_snapshot)
+    return restored_request
+
+
 class UnixServer(socketserver.ThreadingUnixStreamServer):
     allow_reuse_address = True
     daemon_threads = True
@@ -300,8 +331,8 @@ class UnixServer(socketserver.ThreadingUnixStreamServer):
 def run_foreground(socket_path: Path = SOCKET_PATH) -> int:
     if os.geteuid() != 0:
         raise PermissionError("daemon must run as root")
-    close_broad_window()
     SOCKET_DIR.mkdir(parents=True, exist_ok=True)
+    restore_active_request_state(STATE)
     try:
         socket_path.unlink()
     except FileNotFoundError:

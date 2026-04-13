@@ -27,11 +27,11 @@ sudo-request cancel <request-id>
 sudo-request doctor
 sudo-request daemon --foreground
 sudo-request update-itself [--source <checkout>] [--window-seconds N]
+sudo-request cleanup
 sudo sudo-request install
 sudo sudo-request uninstall
 sudo sudo-request install-daemon
 sudo sudo-request uninstall-daemon
-sudo sudo-request cleanup
 ```
 
 ## Install

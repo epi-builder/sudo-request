@@ -55,6 +55,31 @@ class RequestLifecycle:
             approval_messages=[dict(item) for item in payload.get("approval_messages", [])],
         )
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RequestLifecycle:
+        request = cls(
+            request_id=str(data["request_id"]),
+            payload_hash=str(data["payload_hash"]),
+            uid=int(data["uid"]),
+            user=str(data["user"]),
+            host=str(data["host"]),
+            argv=list(data["argv"]),
+            cwd=str(data["cwd"]),
+            resolved_executable=str(data["resolved_executable"]),
+            parent_process=dict(data["parent_process"]),
+            expires_at=int(data["expires_at"]),
+            requested_window_seconds=int(data["requested_window_seconds"]),
+            max_window_seconds=int(data["max_window_seconds"]),
+            window_expires_at=int(data["window_expires_at"]) if data.get("window_expires_at") is not None else None,
+            phase=RequestPhase(str(data.get("phase") or RequestPhase.PENDING_APPROVAL.value)),
+            approval_messages=[dict(item) for item in data.get("approval_messages", [])],
+            exit_code=int(data["exit_code"]) if data.get("exit_code") is not None else None,
+        )
+        return request
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.to_status_dict()
+
     def to_status_dict(self) -> dict[str, Any]:
         return {
             "request_id": self.request_id,
