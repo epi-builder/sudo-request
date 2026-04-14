@@ -28,6 +28,12 @@ Update `CHANGELOG.md` in the same change.
 scripts/release-check.sh
 ```
 
+With Task:
+
+```bash
+task release-check
+```
+
 This runs version consistency, unit tests, CLI smoke checks, compileall, and
 `uv build --no-sources`. The `--no-sources` build checks the package without
 local source overrides.
@@ -53,10 +59,22 @@ rm -rf dist
 uv build --no-sources
 ```
 
+With Task:
+
+```bash
+task build
+```
+
 Publish to TestPyPI first:
 
 ```bash
 uv publish --publish-url https://test.pypi.org/legacy/ dist/*
+```
+
+With Task:
+
+```bash
+task publish-test
 ```
 
 Install from TestPyPI in a clean environment and verify:
@@ -75,6 +93,12 @@ Publish to PyPI:
 
 ```bash
 uv publish dist/*
+```
+
+With Task:
+
+```bash
+task publish
 ```
 
 Create and push a matching git tag after the PyPI release succeeds:

@@ -1,0 +1,146 @@
+version: "3"
+
+vars:
+  PACKAGE: sudo-request
+  SOURCE: '{{.SOURCE | default .ROOT_DIR}}'
+  WINDOW_SECONDS: '{{.WINDOW_SECONDS | default "30"}}'
+  VERSION:
+    sh: uv run python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])'
+  WHEEL: dist/sudo_request-{{.VERSION}}-py3-none-any.whl
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  check-version:
+    desc: Check pyproject/package version consistency
+    cmds:
+      - uv run python scripts/check-version.py
+
+  test:
+    desc: Run unit tests
+    cmds:
+      - uv run python -m unittest discover -s tests
+
+  compile:
+    desc: Compile source, tests, and scripts
+    cmds:
+      - uv run python -m compileall -q src tests scripts
+
+  smoke:
+    desc: Run source checkout smoke checks
+    cmds:
+      - scripts/e2e-smoke.sh
+
+  release-check:
+    desc: Run full local release check and build artifacts
+    cmds:
+      - scripts/release-check.sh
+
+  build:
+    desc: Build fresh sdist and wheel artifacts
+    cmds:
+      - rm -rf dist
+      - uv build --no-sources
+
+  wheel-smoke:
+    desc: Verify the freshly built wheel can run the CLI
+    deps: [build]
+    cmds:
+      - uvx --from ./{{.WHEEL}} sudo-request --version
+      - uvx --from ./{{.WHEEL}} sudo-request --help >/dev/null
+
+  publish-dry-run:
+    desc: Dry-run PyPI upload using built artifacts
+    deps: [build]
+    cmds:
+      - uv publish --dry-run dist/*
+
+  publish-test:
+    desc: Publish built artifacts to TestPyPI
+    deps: [build]
+    cmds:
+      - uv publish --publish-url https://test.pypi.org/legacy/ dist/*
+
+  verify-test-pypi:
+    desc: Verify the package from TestPyPI
+    cmds:
+      - uvx --default-index https://test.pypi.org/simple/ --from {{.PACKAGE}} sudo-request --version
+
+  publish:
+    desc: Publish built artifacts to PyPI
+    deps: [build]
+    cmds:
+      - uv publish dist/*
+
+  bump:
+    desc: Bump package version, for example task bump NEW_VERSION=0.1.1
+    requires:
+      vars: [NEW_VERSION]
+    cmds:
+      - uv run python scripts/bump-version.py {{.NEW_VERSION}}
+      - uv run python scripts/check-version.py
+
+  tag:
+    desc: Create a git tag for the current version
+    cmds:
+      - git tag v{{.VERSION}}
+
+  push-tag:
+    desc: Push the git tag for the current version
+    cmds:
+      - git push origin v{{.VERSION}}
+
+  install-source:
+    desc: Install from this source checkout using local sudo
+    cmds:
+      - sudo uv run sudo-request install
+
+  install-package:
+    desc: Install from the published PyPI package using local sudo
+    cmds:
+      - sudo uvx --from {{.PACKAGE}} sudo-request install
+
+  update-source:
+    desc: Approval-based update of installed copy from a source checkout
+    cmds:
+      - sudo-request update-itself --source {{.SOURCE}} --window-seconds {{.WINDOW_SECONDS}}
+
+  verify-installed:
+    desc: Verify installed daemon state and confirm sudo window is closed
+    cmds:
+      - sudo-request doctor
+      - sudo-request status
+      - |
+        if /usr/bin/sudo -n /usr/bin/id -u >/tmp/sudo-request-task-sudo-check.out 2>&1; then
+          echo "passwordless sudo is still available; expected a closed sudo window" >&2
+          cat /tmp/sudo-request-task-sudo-check.out >&2
+          exit 1
+        fi
+        if ! grep -q "a password is required" /tmp/sudo-request-task-sudo-check.out; then
+          cat /tmp/sudo-request-task-sudo-check.out >&2
+          exit 1
+        fi
+        echo "sudo window closed"
+
+  e2e-installed:
+    desc: Run Telegram-approved manual e2e against installed command
+    cmds:
+      - SUDO_REQUEST_BIN=sudo-request scripts/e2e-root-manual.sh
+
+  uninstall:
+    desc: Remove installed files and daemon using local sudo
+    cmds:
+      - sudo sudo-request uninstall
+
+  status:
+    desc: Show installed sudo-request status
+    cmds:
+      - sudo-request status
+
+  doctor:
+    desc: Run installed sudo-request doctor
+    cmds:
+      - sudo-request doctor

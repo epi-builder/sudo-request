@@ -118,6 +118,16 @@ uv run python -m unittest discover -s tests
 scripts/e2e-smoke.sh
 ```
 
+Common local workflows are also available through Task:
+
+```bash
+task --list
+task release-check
+task install-source
+task verify-installed
+task uninstall
+```
+
 Detailed project-maintenance docs live under [docs/](docs/):
 
 - [docs/architecture.md](docs/architecture.md)
