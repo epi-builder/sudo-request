@@ -4,7 +4,23 @@ version = "0.1.0"
 description = "Telegram-approved temporary broad NOPASSWD sudoers window for personal macOS agents"
 readme = "README.md"
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = []
+keywords = ["macos", "sudo", "telegram", "agent", "automation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: MacOS X",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Systems Administration",
+]
+
+[project.urls]
+Repository = "https://github.com/epi-builder/sudo-request"
+Issues = "https://github.com/epi-builder/sudo-request/issues"
 
 [project.scripts]
 sudo-request = "sudo_request.app.cli.main:main"

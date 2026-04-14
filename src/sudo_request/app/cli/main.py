@@ -9,11 +9,13 @@ from sudo_request.app.cli.install_commands import command_update_itself, install
 from sudo_request.app.cli.ipc_commands import command_cancel, command_cleanup, ipc_request
 from sudo_request.app.cli.run import command_run
 from sudo_request.app.cli.status import command_status
+from sudo_request import __version__
 from sudo_request.lib.constants import BIN_PATH
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="sudo-request")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     run_p = sub.add_parser("run")
@@ -27,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("doctor")
     daemon_p = sub.add_parser("daemon")
     daemon_p.add_argument("--foreground", action="store_true")
-    sub.add_parser("install", help="root-only install from the current source tree")
+    sub.add_parser("install", help="root-only install files and daemon from this checkout or installed package")
     sub.add_parser("uninstall", help="root-only remove installed files and daemon")
     sub.add_parser("install-daemon", help="root-only install or reload the launchd daemon")
     sub.add_parser("uninstall-daemon", help="root-only remove the launchd daemon")

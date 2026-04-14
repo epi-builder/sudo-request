@@ -11,6 +11,12 @@ uv run sudo-request --help
 scripts/e2e-smoke.sh
 ```
 
+Before publishing a package release:
+
+```bash
+scripts/release-check.sh
+```
+
 `scripts/e2e-smoke.sh` is source-checkout based. It runs unit tests, CLI help,
 doctor smoke, and compileall.
 

@@ -27,14 +27,9 @@ def install_tool() -> int:
     if os.geteuid() != 0:
         print("install must be run with sudo/root", file=sys.stderr)
         return EXIT_DAEMON_FAILURE
-    source_root = project_root()
     if INSTALL_PREFIX.exists():
         shutil.rmtree(INSTALL_PREFIX)
-    shutil.copytree(
-        source_root,
-        INSTALL_PREFIX,
-        ignore=shutil.ignore_patterns(".venv", "__pycache__", "*.pyc", ".pytest_cache", ".ruff_cache", "dist", "build", "*.egg-info"),
-    )
+    copy_install_tree(INSTALL_PREFIX)
     os.chown(INSTALL_PREFIX, 0, 0)
     for path in INSTALL_PREFIX.rglob("*"):
         try:
@@ -62,6 +57,26 @@ def install_tool() -> int:
 
 def project_root() -> Path:
     return Path(__file__).resolve().parents[4]
+
+
+def package_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def is_source_checkout(root: Path) -> bool:
+    return (root / "pyproject.toml").exists() and (root / "src" / "sudo_request").is_dir()
+
+
+def copy_install_tree(destination: Path) -> None:
+    source_root = project_root()
+    ignore = shutil.ignore_patterns(".venv", "__pycache__", "*.pyc", ".pytest_cache", ".ruff_cache", "dist", "build", "*.egg-info")
+    if is_source_checkout(source_root):
+        shutil.copytree(source_root, destination, ignore=ignore)
+        return
+
+    package_destination = destination / "src" / "sudo_request"
+    package_destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(package_root(), package_destination, ignore=ignore)
 
 
 def resolve_update_source(source: str | None = None) -> Path:

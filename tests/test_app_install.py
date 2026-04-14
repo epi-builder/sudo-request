@@ -3,8 +3,9 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from sudo_request.app.cli.install_commands import project_root, render_launchd_plist, resolve_update_source, update_itself_command
+from sudo_request.app.cli.install_commands import copy_install_tree, project_root, render_launchd_plist, resolve_update_source, update_itself_command
 from sudo_request.lib.constants import INSTALL_PREFIX
 from tests.helpers import make_source_checkout
 
@@ -37,6 +38,26 @@ class InstallTests(unittest.TestCase):
         self.assertIn("<string>daemon</string>", plist)
         self.assertIn("<string>--foreground</string>", plist)
         self.assertIn("<key>KeepAlive</key>", plist)
+
+    def test_copy_install_tree_copies_source_checkout(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = make_source_checkout(Path(tmp) / "source")
+            destination = Path(tmp) / "install"
+            with patch("sudo_request.app.cli.install_commands.project_root", return_value=root):
+                copy_install_tree(destination)
+            self.assertTrue((destination / "pyproject.toml").exists())
+            self.assertTrue((destination / "src" / "sudo_request").is_dir())
+
+    def test_copy_install_tree_copies_imported_package_without_checkout(self) -> None:
+        with TemporaryDirectory() as tmp:
+            package = Path(tmp) / "site-packages" / "sudo_request"
+            package.mkdir(parents=True)
+            (package / "__init__.py").write_text('__version__ = "0.1.0"\n', encoding="utf-8")
+            destination = Path(tmp) / "install"
+            with patch("sudo_request.app.cli.install_commands.project_root", return_value=Path(tmp) / "venv"):
+                with patch("sudo_request.app.cli.install_commands.package_root", return_value=package):
+                    copy_install_tree(destination)
+            self.assertTrue((destination / "src" / "sudo_request" / "__init__.py").exists())
 
 
 if __name__ == "__main__":

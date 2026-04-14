@@ -11,6 +11,13 @@ Initial low-level install requires local sudo/admin authentication:
 sudo uv run sudo-request install
 ```
 
+After the package is published, the same root install can be started from the
+published package:
+
+```bash
+sudo uvx --from sudo-request sudo-request install
+```
+
 After the tool is installed, prefer approval-based self-update instead of direct
 sudo install:
 

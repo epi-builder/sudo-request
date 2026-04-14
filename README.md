@@ -45,6 +45,13 @@ From this source checkout:
 sudo uv run sudo-request install
 ```
 
+After the package is published, a package-based install can also be started
+from an installed or ephemeral package command:
+
+```bash
+sudo uvx --from sudo-request sudo-request install
+```
+
 This copies the tool to `/usr/local/libexec/sudo-request`, writes a PATH wrapper
 at `/usr/local/bin/sudo-request`, and installs a launchd daemon.
 
@@ -116,3 +123,8 @@ Detailed project-maintenance docs live under [docs/](docs/):
 - [docs/architecture.md](docs/architecture.md)
 - [docs/development.md](docs/development.md)
 - [docs/operations.md](docs/operations.md)
+- [docs/release.md](docs/release.md)
+
+## License
+
+MIT. See [LICENSE](LICENSE).

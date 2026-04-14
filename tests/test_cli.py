@@ -2,16 +2,25 @@ from __future__ import annotations
 
 import unittest
 import time
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from unittest.mock import ANY, Mock, patch
 
+from sudo_request import __version__
+from sudo_request.app.cli.main import main
 from sudo_request.app.cli.install_commands import command_update_itself
 from sudo_request.app.cli.run import command_run, ipc_request_with_heartbeat
 from tests.helpers import sample_config
 
 
 class CliTests(unittest.TestCase):
+    def test_main_prints_version(self) -> None:
+        with redirect_stdout(StringIO()) as stdout:
+            with self.assertRaises(SystemExit) as ctx:
+                main(["--version"])
+        self.assertEqual(ctx.exception.code, 0)
+        self.assertEqual(stdout.getvalue(), f"sudo-request {__version__}\n")
+
     def test_command_run_rejects_non_positive_window(self) -> None:
         with redirect_stderr(StringIO()) as stderr:
             self.assertEqual(command_run(["/bin/echo", "ok"], 0), 125)
