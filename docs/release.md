@@ -3,9 +3,9 @@
 Use this guide when preparing a PyPI release. This repository uses `uv` for
 build and publish commands.
 
-## First Release Checklist
+## Release Checklist
 
-Before publishing `0.1.0`, confirm:
+Before publishing, confirm:
 
 - The package name is available on PyPI and TestPyPI.
 - The MIT license is still the intended public license.
@@ -16,8 +16,7 @@ Before publishing `0.1.0`, confirm:
 ## Version Bump
 
 ```bash
-uv run python scripts/bump-version.py 0.1.1
-uv run python scripts/check-version.py
+task release:bump NEW_VERSION=0.1.1
 ```
 
 Update `CHANGELOG.md` in the same change.
@@ -63,6 +62,7 @@ export PYPI_TOKEN="pypi-..."
 task release:publish
 task release:tag
 task release:push-tag
+task release:bump NEW_VERSION=<next_version>
 ```
 
 `release:publish-test` and `release:publish` build fresh artifacts before
@@ -110,8 +110,8 @@ task release:publish
 Create and push a matching git tag after the PyPI release succeeds:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v<version>
+git push origin v<version>
 ```
 
 With Task:
@@ -119,4 +119,11 @@ With Task:
 ```bash
 task release:tag
 task release:push-tag
+```
+
+After the release tag is pushed, bump to the next development version and add a
+new `Unreleased` section to `CHANGELOG.md`:
+
+```bash
+task release:bump NEW_VERSION=<next_version>
 ```
