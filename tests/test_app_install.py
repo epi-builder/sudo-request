@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from sudo_request.app.cli.install import project_root, render_launchd_plist, resolve_update_source, update_itself_command
+from sudo_request.app.cli.install_commands import project_root, render_launchd_plist, resolve_update_source, update_itself_command
 from sudo_request.lib.constants import INSTALL_PREFIX
 from tests.helpers import make_source_checkout
 

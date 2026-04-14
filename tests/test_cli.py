@@ -6,7 +6,8 @@ from contextlib import redirect_stderr
 from io import StringIO
 from unittest.mock import ANY, Mock, patch
 
-from sudo_request.app.cli.run import command_run, command_update_itself, ipc_request_with_heartbeat
+from sudo_request.app.cli.install_commands import command_update_itself
+from sudo_request.app.cli.run import command_run, ipc_request_with_heartbeat
 from tests.helpers import sample_config
 
 
@@ -45,8 +46,8 @@ class CliTests(unittest.TestCase):
         self.assertEqual(lifecycle.call_args_list[1].args, ("req-1", "hash-1", "done", 7))
 
     def test_command_update_itself_wraps_install_command(self) -> None:
-        with patch("sudo_request.app.cli.run.update_itself_command", return_value=["/usr/bin/sudo", "/usr/bin/python3", "-m", "sudo_request", "install"]):
-            with patch("sudo_request.app.cli.run.command_run", return_value=0) as run:
+        with patch("sudo_request.app.cli.install_commands.update_itself_command", return_value=["/usr/bin/sudo", "/usr/bin/python3", "-m", "sudo_request", "install"]):
+            with patch("sudo_request.app.cli.install_commands.command_run", return_value=0) as run:
                 self.assertEqual(command_update_itself("/src", 12), 0)
         run.assert_called_once_with(["/usr/bin/sudo", "/usr/bin/python3", "-m", "sudo_request", "install"], 12, ANY)
 

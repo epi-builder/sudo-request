@@ -7,8 +7,20 @@ import subprocess
 import sys
 from pathlib import Path
 
-from sudo_request.lib.constants import BIN_PATH, EXIT_DAEMON_FAILURE, INSTALL_PREFIX, LAUNCHD_PLIST
+from sudo_request.app.cli.ipc_commands import IPCRequest, ipc_request
+from sudo_request.app.cli.output import print_error
+from sudo_request.app.cli.run import command_run
+from sudo_request.lib.constants import BIN_PATH, EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK, INSTALL_PREFIX, LAUNCHD_PLIST
 from sudo_request.lib.security.sudoers import cleanup_broad_rule
+
+
+def command_update_itself(source: str | None = None, window_seconds: int = 30, ipc_request_func: IPCRequest = ipc_request) -> int:
+    try:
+        cmd = update_itself_command(source)
+    except Exception as exc:
+        print_error("policy_block", exit_code=EXIT_POLICY_BLOCK, action="update_itself", message=str(exc))
+        return EXIT_POLICY_BLOCK
+    return command_run(cmd, window_seconds, ipc_request_func)
 
 
 def install_tool() -> int:

@@ -8,21 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from sudo_request.app.cli.cleanup import close_request_with_diagnostics
-from sudo_request.app.cli.install import update_itself_command
 from sudo_request.app.cli.ipc_commands import IPCRequest, ipc_request
 from sudo_request.app.cli.output import print_daemon_unreachable, print_error, print_error_response
 from sudo_request.lib.audit import append_jsonl_best_effort, user_audit_path
 from sudo_request.lib.config import Config, load_config
 from sudo_request.lib.constants import EXIT_DAEMON_FAILURE, EXIT_POLICY_BLOCK
-
-
-def command_update_itself(source: str | None = None, window_seconds: int = 30, ipc_request_func: IPCRequest = ipc_request) -> int:
-    try:
-        cmd = update_itself_command(source)
-    except Exception as exc:
-        print_error("policy_block", exit_code=EXIT_POLICY_BLOCK, action="update_itself", message=str(exc))
-        return EXIT_POLICY_BLOCK
-    return command_run(cmd, window_seconds, ipc_request_func)
 
 
 def command_run(cmd: list[str], window_seconds: int | None = None, ipc_request_func: IPCRequest = ipc_request) -> int:

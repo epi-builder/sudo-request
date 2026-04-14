@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 from sudo_request.app.cli.doctor import command_doctor
-from sudo_request.app.cli.install import install_daemon, install_tool, uninstall_daemon, uninstall_tool
+from sudo_request.app.cli.install_commands import command_update_itself, install_daemon, install_tool, uninstall_daemon, uninstall_tool
 from sudo_request.app.cli.ipc_commands import command_cancel, command_cleanup, ipc_request
-from sudo_request.app.cli.run import command_run, command_update_itself
+from sudo_request.app.cli.run import command_run
 from sudo_request.app.cli.status import command_status
 from sudo_request.lib.constants import BIN_PATH
 
