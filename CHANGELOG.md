@@ -5,6 +5,7 @@
 ### Changed
 
 - Split release/publish tasks into a dedicated `release:` Taskfile namespace.
+- Add a repository-local `sudo-request-run` skill for AI agents.
 
 ### Fixed
 

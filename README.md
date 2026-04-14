@@ -135,6 +135,13 @@ Detailed project-maintenance docs live under [docs/](docs/):
 - [docs/operations.md](docs/operations.md)
 - [docs/release.md](docs/release.md)
 
+## Agent Skill
+
+Agents that support local skills can use
+[skills/sudo-request-run/SKILL.md](skills/sudo-request-run/SKILL.md) for the
+safe command patterns and broad-mode warnings needed to run sudo-required work
+through `sudo-request`.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

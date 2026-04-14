@@ -32,5 +32,8 @@ build-backend = "uv_build"
 [tool.uv]
 package = true
 
+[tool.uv.build-backend]
+source-include = ["skills/**"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]

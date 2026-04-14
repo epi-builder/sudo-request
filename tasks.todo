@@ -13,6 +13,7 @@
 - [x] timeout/deny/daemon failure stderr 메시지 포맷을 agent가 읽기 쉽도록 더 일관화
 - [ ] 긴 `--window-seconds` 요청이 max에 가까울 때 Telegram 승인 메시지에 추가 경고 표시
 - [ ] self-management/install 명령처럼 `/usr/bin/sudo /usr/bin/env ... python -m sudo_request install` 형태의 요청을 Telegram에서 더 명확히 표시
+- [ ] 사용자가 저장소 내 `skills/sudo-request-run`을 로컬 에이전트 스킬 디렉터리에 쉽게 설치/업데이트할 수 있는 CLI 또는 Task 도구 제공
 
 리팩토링:
 - [x] Telegram 상태 업데이트 API를 `send approval`, `mark status`, `wait decision` 책임으로 더 명시적으로 정리
