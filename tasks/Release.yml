@@ -1,0 +1,65 @@
+version: "3"
+
+vars:
+  PACKAGE: sudo-request
+  VERSION:
+    sh: uv run python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])'
+  WHEEL: dist/sudo_request-{{.VERSION}}-py3-none-any.whl
+
+tasks:
+  check:
+    desc: Run the full local release check and build artifacts
+    cmds:
+      - scripts/release-check.sh
+
+  bump:
+    desc: Bump package version, for example task release:bump NEW_VERSION=0.1.1
+    requires:
+      vars: [NEW_VERSION]
+    cmds:
+      - uv run python scripts/bump-version.py {{.NEW_VERSION}}
+      - uv run python scripts/check-version.py
+
+  build:
+    internal: true
+    cmds:
+      - rm -rf dist
+      - uv build --no-sources
+
+  publish-test:
+    desc: Publish built artifacts to TestPyPI
+    deps: [build]
+    cmds:
+      - |
+        if [ -z "${TEST_PYPI_TOKEN:-}" ]; then
+          echo "TEST_PYPI_TOKEN is required. Create it at https://test.pypi.org/manage/account/token/." >&2
+          echo "PyPI tokens from pypi.org do not work on TestPyPI." >&2
+          exit 2
+        fi
+        uv publish --publish-url https://test.pypi.org/legacy/ --token "$TEST_PYPI_TOKEN" dist/*
+
+  verify-test-pypi:
+    desc: Verify the package from TestPyPI
+    cmds:
+      - uvx --default-index https://test.pypi.org/simple/ --from {{.PACKAGE}} sudo-request --version
+
+  publish:
+    desc: Publish built artifacts to PyPI
+    deps: [build]
+    cmds:
+      - |
+        if [ -z "${PYPI_TOKEN:-}" ]; then
+          echo "PYPI_TOKEN is required. Create it at https://pypi.org/manage/account/token/." >&2
+          exit 2
+        fi
+        uv publish --token "$PYPI_TOKEN" dist/*
+
+  tag:
+    desc: Create a git tag for the current version
+    cmds:
+      - git tag v{{.VERSION}}
+
+  push-tag:
+    desc: Push the git tag for the current version
+    cmds:
+      - git push origin v{{.VERSION}}

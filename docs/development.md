@@ -20,7 +20,7 @@ scripts/release-check.sh
 The same check is available through Task:
 
 ```bash
-task release-check
+task release:check
 ```
 
 `scripts/e2e-smoke.sh` is source-checkout based. It runs unit tests, CLI help,

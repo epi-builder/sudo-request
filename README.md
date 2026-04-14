@@ -122,7 +122,7 @@ Common local workflows are also available through Task:
 
 ```bash
 task --list
-task release-check
+task release:check
 task install-source
 task verify-installed
 task uninstall

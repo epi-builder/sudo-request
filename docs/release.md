@@ -31,7 +31,7 @@ scripts/release-check.sh
 With Task:
 
 ```bash
-task release-check
+task release:check
 ```
 
 This runs version consistency, unit tests, CLI smoke checks, compileall, and
@@ -50,20 +50,24 @@ sudo-request status
 The final sudo command should fail with a password-required message after the
 approved window is cleaned up.
 
-## Publish
+## Release Process
 
-Build fresh artifacts:
-
-```bash
-rm -rf dist
-uv build --no-sources
-```
-
-With Task:
+The normal release path is:
 
 ```bash
-task build
+task release:check
+export TEST_PYPI_TOKEN="pypi-..."
+task release:publish-test
+task release:verify-test-pypi
+export PYPI_TOKEN="pypi-..."
+task release:publish
+task release:tag
+task release:push-tag
 ```
+
+`release:publish-test` and `release:publish` build fresh artifacts before
+uploading. TestPyPI and PyPI use separate accounts/projects/tokens, so a token
+created on `pypi.org` will fail against `test.pypi.org`, and vice versa.
 
 Publish to TestPyPI first:
 
@@ -74,7 +78,8 @@ uv publish --publish-url https://test.pypi.org/legacy/ dist/*
 With Task:
 
 ```bash
-task publish-test
+export TEST_PYPI_TOKEN="pypi-..."
+task release:publish-test
 ```
 
 Install from TestPyPI in a clean environment and verify:
@@ -83,10 +88,10 @@ Install from TestPyPI in a clean environment and verify:
 uvx --default-index https://test.pypi.org/simple/ --from sudo-request sudo-request --version
 ```
 
-Before uploading, you can also smoke-test the freshly built wheel:
+With Task:
 
 ```bash
-uvx --from ./dist/sudo_request-0.1.0-py3-none-any.whl sudo-request --version
+task release:verify-test-pypi
 ```
 
 Publish to PyPI:
@@ -98,7 +103,8 @@ uv publish dist/*
 With Task:
 
 ```bash
-task publish
+export PYPI_TOKEN="pypi-..."
+task release:publish
 ```
 
 Create and push a matching git tag after the PyPI release succeeds:
@@ -106,4 +112,11 @@ Create and push a matching git tag after the PyPI release succeeds:
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
+```
+
+With Task:
+
+```bash
+task release:tag
+task release:push-tag
 ```
