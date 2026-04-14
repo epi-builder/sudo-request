@@ -6,25 +6,12 @@ from unittest.mock import patch
 from sudo_request.lib.approval.decision import approval_callback_data
 from sudo_request.lib.approval.message import approval_message_text, cleanup_critical_message_text, format_local_timestamp
 from sudo_request.lib.approval.telegram import TelegramClient
+from tests.helpers import sample_approval_payload
 
 
 class TelegramTests(unittest.TestCase):
     def payload(self):
-        return {
-            "host": "host",
-            "user": "epikem",
-            "uid": 501,
-            "cwd": "/tmp",
-            "argv": ["/bin/echo", "ok"],
-            "resolved_executable": "/bin/echo",
-            "parent_process": {"pid": 1},
-            "requested_window_seconds": 30,
-            "max_window_seconds": 300,
-            "expires_at": 1,
-            "payload_hash": "a" * 64,
-            "request_id": "r" * 24,
-            "nonce": "n" * 24,
-        }
+        return sample_approval_payload()
 
     def test_callback_data_fits_telegram_limit(self) -> None:
         payload = self.payload()

@@ -9,15 +9,12 @@ from sudo_request.lib.approval.decision import (
     parse_callback_data,
     timeout_result,
 )
+from tests.helpers import sample_approval_payload
 
 
 class ApprovalDecisionTests(unittest.TestCase):
     def payload(self):
-        return {
-            "request_id": "r" * 24,
-            "payload_hash": "a" * 64,
-            "nonce": "n" * 24,
-        }
+        return sample_approval_payload()
 
     def callback(self, data: str, user_id: int = 123):
         return {"id": "callback-id", "from": {"id": user_id}, "data": data}

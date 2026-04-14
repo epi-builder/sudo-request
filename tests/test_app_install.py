@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 
 from sudo_request.app.cli.install import project_root, render_launchd_plist, resolve_update_source, update_itself_command
 from sudo_request.lib.constants import INSTALL_PREFIX
+from tests.helpers import make_source_checkout
 
 
 class InstallTests(unittest.TestCase):
@@ -15,9 +16,7 @@ class InstallTests(unittest.TestCase):
 
     def test_resolve_update_source_accepts_source_checkout(self) -> None:
         with TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            (root / "pyproject.toml").write_text("[project]\nname = 'x'\n", encoding="utf-8")
-            (root / "src" / "sudo_request").mkdir(parents=True)
+            root = make_source_checkout(Path(tmp))
             self.assertEqual(resolve_update_source(str(root)), root.resolve(strict=False))
 
     def test_resolve_update_source_rejects_installed_prefix_without_source(self) -> None:
@@ -26,9 +25,7 @@ class InstallTests(unittest.TestCase):
 
     def test_update_itself_command_uses_source_pythonpath(self) -> None:
         with TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            (root / "pyproject.toml").write_text("[project]\nname = 'x'\n", encoding="utf-8")
-            (root / "src" / "sudo_request").mkdir(parents=True)
+            root = make_source_checkout(Path(tmp))
             cmd = update_itself_command(str(root), python="/usr/bin/python3")
             resolved_root = root.resolve(strict=False)
         self.assertEqual(cmd[:3], ["/usr/bin/sudo", "/usr/bin/env", f"PYTHONPATH={resolved_root / 'src'}"])

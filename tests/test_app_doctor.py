@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from sudo_request.app.cli.doctor import command_doctor, format_path_check, passwordless_sudo_status
-from sudo_request.lib.config import Config
+from tests.helpers import sample_config
 
 
 class DoctorTests(unittest.TestCase):
@@ -57,7 +57,7 @@ class DoctorTests(unittest.TestCase):
         def sudo_runner(*_args, **_kwargs):
             return subprocess.CompletedProcess(["/usr/bin/sudo"], 1, "", "sudo: a password is required\n")
 
-        cfg = Config(Path("/tmp/sudo-request-token"), [123])
+        cfg = sample_config("/tmp/sudo-request-token", [123])
         with patch("sudo_request.app.cli.doctor.load_config", return_value=cfg):
             with redirect_stdout(StringIO()) as stdout:
                 self.assertEqual(command_doctor(ipc_request, sudo_runner), 0)

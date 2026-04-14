@@ -31,5 +31,5 @@
 - [x] `run` command flow를 `app/run.py`로 분리
 - [x] `status`, `cancel`, `cleanup` IPC command wrappers를 `app/status.py` 또는 `app/ipc_commands.py`로 분리
 - [ ] install/update/self-management 로직을 `app/install_commands.py`로 분리
-- [ ] 테스트 공통 fixture/helper를 `tests/helpers.py`로 분리
+- [x] 테스트 공통 fixture/helper를 `tests/helpers.py`로 분리
 - [x] README, docs, audit-memo, sudo-request-run skill의 실행 경로와 책임 설명 동기화

@@ -4,31 +4,14 @@ import unittest
 from unittest.mock import Mock, patch
 
 from sudo_request.app.daemon import watchdog
-from sudo_request.app.daemon.lifecycle import RequestLifecycle
 from sudo_request.app.daemon.state import DaemonState
-
-
-def lifecycle(request_id: str) -> RequestLifecycle:
-    return RequestLifecycle(
-        request_id=request_id,
-        payload_hash=f"hash-{request_id}",
-        uid=501,
-        user="epikem",
-        host="host",
-        argv=["/bin/echo", "ok"],
-        cwd="/tmp",
-        resolved_executable="/bin/echo",
-        parent_process={"pid": 1},
-        expires_at=1_776_000_000,
-        requested_window_seconds=30,
-        max_window_seconds=300,
-    )
+from tests.helpers import sample_lifecycle
 
 
 class DaemonWatchdogTests(unittest.TestCase):
     def test_watchdog_cleanup_failure_sends_critical_alert(self) -> None:
         state = DaemonState()
-        self.assertTrue(state.begin(lifecycle("one")))
+        self.assertTrue(state.begin(sample_lifecycle("one")))
         alert = Mock()
 
         with patch.object(watchdog, "close_broad_window", return_value=False):
@@ -42,7 +25,7 @@ class DaemonWatchdogTests(unittest.TestCase):
 
     def test_watchdog_cleanup_success_expires_and_clears_request(self) -> None:
         state = DaemonState()
-        self.assertTrue(state.begin(lifecycle("one")))
+        self.assertTrue(state.begin(sample_lifecycle("one")))
         alert = Mock()
 
         with patch.object(watchdog, "close_broad_window", return_value=True):

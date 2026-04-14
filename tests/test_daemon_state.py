@@ -6,39 +6,22 @@ from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 
 from sudo_request.app.daemon import server
-from sudo_request.app.daemon.lifecycle import RequestLifecycle, RequestPhase
+from sudo_request.app.daemon.lifecycle import RequestPhase
 from sudo_request.app.daemon.state import DaemonState
-from sudo_request.lib.config import Config
-
-
-def lifecycle(request_id: str, user: str = "epikem") -> RequestLifecycle:
-    return RequestLifecycle(
-        request_id=request_id,
-        payload_hash=f"hash-{request_id}",
-        uid=501,
-        user=user,
-        host="host",
-        argv=["/bin/echo", "ok"],
-        cwd="/tmp",
-        resolved_executable="/bin/echo",
-        parent_process={"pid": 1},
-        expires_at=1_776_000_000,
-        requested_window_seconds=30,
-        max_window_seconds=300,
-    )
+from tests.helpers import sample_config, sample_lifecycle
 
 
 class DaemonStateTests(unittest.TestCase):
     def test_single_active_request(self) -> None:
         state = DaemonState()
-        self.assertTrue(state.begin(lifecycle("one")))
-        self.assertFalse(state.begin(lifecycle("two")))
+        self.assertTrue(state.begin(sample_lifecycle("one")))
+        self.assertFalse(state.begin(sample_lifecycle("two")))
         state.clear("one")
-        self.assertTrue(state.begin(lifecycle("two")))
+        self.assertTrue(state.begin(sample_lifecycle("two")))
 
     def test_status_snapshot_includes_lifecycle_details(self) -> None:
         state = DaemonState()
-        self.assertTrue(state.begin(lifecycle("one")))
+        self.assertTrue(state.begin(sample_lifecycle("one")))
         self.assertTrue(state.set_phase("one", RequestPhase.WINDOW_OPEN))
 
         status = state.status()
@@ -52,7 +35,7 @@ class DaemonStateTests(unittest.TestCase):
 
     def test_window_expiry_updates_status_snapshot(self) -> None:
         state = DaemonState()
-        self.assertTrue(state.begin(lifecycle("one")))
+        self.assertTrue(state.begin(sample_lifecycle("one")))
 
         self.assertTrue(state.set_window_expires_at("one", 1_776_000_030))
 
@@ -63,7 +46,7 @@ class DaemonStateTests(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             state_path = Path(tmpdir) / "active-request.json"
             state = DaemonState(state_path)
-            active = lifecycle("one")
+            active = sample_lifecycle("one")
 
             self.assertTrue(state.begin(active))
             self.assertTrue(state.set_approval_messages("one", [{"chat_id": 123, "message_id": 456}]))
@@ -84,7 +67,7 @@ class DaemonStateTests(unittest.TestCase):
             state_path = Path(tmpdir) / "active-request.json"
             state = DaemonState(state_path)
 
-            self.assertTrue(state.begin(lifecycle("one")))
+            self.assertTrue(state.begin(sample_lifecycle("one")))
             self.assertTrue(state_path.exists())
 
             state.clear("one")
@@ -117,7 +100,7 @@ class DaemonStateTests(unittest.TestCase):
 
     def test_notification_payload_returns_active_request_payload(self) -> None:
         state = DaemonState()
-        self.assertTrue(state.begin(lifecycle("one")))
+        self.assertTrue(state.begin(sample_lifecycle("one")))
 
         snapshot = state.notification_payload("one")
 
@@ -129,7 +112,7 @@ class DaemonStateTests(unittest.TestCase):
 
     def test_lifecycle_event_updates_active_request_and_marks_telegram(self) -> None:
         state = DaemonState()
-        active = lifecycle("one")
+        active = sample_lifecycle("one")
         active.approval_messages = [{"chat_id": 123, "message_id": 456}]
         self.assertTrue(state.begin(active))
         handler = server.RequestHandler.__new__(server.RequestHandler)
@@ -152,7 +135,7 @@ class DaemonStateTests(unittest.TestCase):
 
     def test_lifecycle_event_rejects_mismatched_hash(self) -> None:
         state = DaemonState()
-        self.assertTrue(state.begin(lifecycle("one")))
+        self.assertTrue(state.begin(sample_lifecycle("one")))
         handler = server.RequestHandler.__new__(server.RequestHandler)
         handler.request = Mock()
 
@@ -171,7 +154,7 @@ class DaemonStateTests(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             state_path = Path(tmpdir) / "active-request.json"
             original = DaemonState(state_path)
-            active = lifecycle("one")
+            active = sample_lifecycle("one")
             active.approval_messages = [{"chat_id": 123, "message_id": 456}]
             self.assertTrue(original.begin(active))
             self.assertTrue(original.set_phase("one", RequestPhase.RUNNING))
@@ -199,7 +182,7 @@ class DaemonStateTests(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             state_path = Path(tmpdir) / "active-request.json"
             original = DaemonState(state_path)
-            self.assertTrue(original.begin(lifecycle("one")))
+            self.assertTrue(original.begin(sample_lifecycle("one")))
 
             state = DaemonState(state_path)
             with patch.object(server, "close_broad_window", return_value=True) as cleanup:
@@ -216,7 +199,7 @@ class DaemonStateTests(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             state_path = Path(tmpdir) / "active-request.json"
             original = DaemonState(state_path)
-            self.assertTrue(original.begin(lifecycle("one")))
+            self.assertTrue(original.begin(sample_lifecycle("one")))
             self.assertTrue(original.set_window_expires_at("one", 1_776_000_030))
             self.assertTrue(original.set_phase("one", RequestPhase.RUNNING))
 
@@ -237,7 +220,7 @@ class DaemonStateTests(unittest.TestCase):
     def test_mark_failed_request_best_effort_updates_existing_approval_messages(self) -> None:
         handler = server.RequestHandler.__new__(server.RequestHandler)
         telegram = Mock()
-        payload = lifecycle("one").to_approval_payload()
+        payload = sample_lifecycle("one").to_approval_payload()
         payload["approval_messages"] = [{"chat_id": 123, "message_id": 456}]
 
         server.RequestHandler.mark_failed_request_best_effort(handler, telegram, payload, "network down")
@@ -248,7 +231,7 @@ class DaemonStateTests(unittest.TestCase):
         handler = server.RequestHandler.__new__(server.RequestHandler)
         telegram = Mock()
         telegram.mark_status.side_effect = RuntimeError("edit failed")
-        payload = lifecycle("one").to_approval_payload()
+        payload = sample_lifecycle("one").to_approval_payload()
         payload["approval_messages"] = [{"chat_id": 123, "message_id": 456}]
 
         with patch.object(server, "append_jsonl") as audit:
@@ -265,8 +248,8 @@ class DaemonStateTests(unittest.TestCase):
         handler = server.RequestHandler.__new__(server.RequestHandler)
         telegram = Mock()
         telegram.send_cleanup_critical_alert.side_effect = [11, 22]
-        payload = lifecycle("one").to_approval_payload()
-        cfg = Config(Path("/token"), [123, 456])
+        payload = sample_lifecycle("one").to_approval_payload()
+        cfg = sample_config("/token", [123, 456])
 
         with patch.object(server, "home_for_uid", return_value=Path("/Users/epikem")):
             with patch.object(server, "load_config", return_value=cfg):
@@ -285,8 +268,8 @@ class DaemonStateTests(unittest.TestCase):
         handler = server.RequestHandler.__new__(server.RequestHandler)
         telegram = Mock()
         telegram.send_cleanup_critical_alert.side_effect = RuntimeError("send failed")
-        payload = lifecycle("one").to_approval_payload()
-        cfg = Config(Path("/token"), [123])
+        payload = sample_lifecycle("one").to_approval_payload()
+        cfg = sample_config("/token", [123])
 
         with patch.object(server, "home_for_uid", return_value=Path("/Users/epikem")):
             with patch.object(server, "load_config", return_value=cfg):
@@ -303,7 +286,7 @@ class DaemonStateTests(unittest.TestCase):
 
     def test_close_request_cleanup_failure_sends_critical_alert_before_clearing(self) -> None:
         state = DaemonState()
-        self.assertTrue(state.begin(lifecycle("one")))
+        self.assertTrue(state.begin(sample_lifecycle("one")))
         handler = server.RequestHandler.__new__(server.RequestHandler)
         handler.request = Mock()
         handler.send_cleanup_critical_alert_best_effort_from_snapshot = Mock()
