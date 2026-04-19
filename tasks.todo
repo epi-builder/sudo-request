@@ -14,6 +14,13 @@
 - [ ] 긴 `--window-seconds` 요청이 max에 가까울 때 Telegram 승인 메시지에 추가 경고 표시
 - [ ] self-management/install 명령처럼 `/usr/bin/sudo /usr/bin/env ... python -m sudo_request install` 형태의 요청을 Telegram에서 더 명확히 표시
 - [ ] 사용자가 저장소 내 `skills/sudo-request-run`을 로컬 에이전트 스킬 디렉터리에 쉽게 설치/업데이트할 수 있는 CLI 또는 Task 도구 제공
+- [x] user-level Telegram 설정을 생성하는 `sudo-request init` 명령 추가
+- [x] `sudo-request doctor`가 config/token/allowed user 누락을 불완전 상태로 표시하고 exit code로 구분
+- [x] root `install` 완료 메시지에 `sudo-request init`을 다음 단계로 안내
+- [ ] `sudo-request run` 시작 전에 config/token/allowed user preflight를 수행해 Telegram 요청 전에 즉시 실패
+- [ ] agent/자동화용 `sudo-request init --from-env` 지원
+- [ ] 기존 설정을 명시적으로 복사하는 `sudo-request init --copy-from <path>` 또는 `--import` 지원
+- [ ] root install에서 token 없이 user config 템플릿만 만드는 안전한 `install --user <name> --init-template` 편의 옵션 검토
 
 리팩토링:
 - [x] Telegram 상태 업데이트 API를 `send approval`, `mark status`, `wait decision` 책임으로 더 명시적으로 정리

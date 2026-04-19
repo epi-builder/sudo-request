@@ -51,7 +51,12 @@ def install_tool() -> int:
         return daemon_code
     print(f"installed sudo-request files: {INSTALL_PREFIX}")
     print(f"installed PATH wrapper: {BIN_PATH}")
-    print("ensure /usr/local/bin is in PATH, then use: sudo-request run -- <command>")
+    print(f"installed daemon: {LAUNCHD_PLIST}")
+    print("")
+    print("Next:")
+    print("  sudo-request init")
+    print("  sudo-request doctor")
+    print("  sudo-request run -- /bin/echo ok")
     return 0
 
 

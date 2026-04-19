@@ -17,6 +17,17 @@ With Task:
 task install-source
 ```
 
+The root install only writes the installed files and launchd daemon. Create the
+user-level Telegram approval config separately:
+
+```bash
+sudo-request init
+```
+
+`init` is safe to rerun. It reports an existing config path, hides any existing
+Telegram token value, and lets the user press Enter to keep existing values or
+enter replacements.
+
 After the package is published, the same root install can be started from the
 published package:
 
@@ -53,6 +64,7 @@ sudo-request: error status=daemon_unreachable request_id=<id> action=close_reque
 After any install/update, verify:
 
 ```bash
+sudo-request init
 sudo-request status
 /usr/bin/sudo -n /usr/bin/id -u
 ```
@@ -68,6 +80,10 @@ Expected closed-window sudo result:
 ```text
 sudo: a password is required
 ```
+
+`sudo-request doctor` reports missing config, missing token files, and empty
+allowed Telegram user lists. A missing user config means the daemon can be
+installed and reachable while `sudo-request run` still cannot request approval.
 
 ## Agent-Readable Errors
 

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from sudo_request.app.cli.install_commands import copy_install_tree, project_root, render_launchd_plist, resolve_update_source, update_itself_command
+from sudo_request.app.cli.install_commands import copy_install_tree, install_tool, project_root, render_launchd_plist, resolve_update_source, update_itself_command
 from sudo_request.lib.constants import INSTALL_PREFIX
 from tests.helpers import make_source_checkout
 
@@ -58,6 +60,28 @@ class InstallTests(unittest.TestCase):
                 with patch("sudo_request.app.cli.install_commands.package_root", return_value=package):
                     copy_install_tree(destination)
             self.assertTrue((destination / "src" / "sudo_request" / "__init__.py").exists())
+
+    def test_install_tool_prints_init_next_step(self) -> None:
+        with patch("sudo_request.app.cli.install_commands.os.geteuid", return_value=0):
+            with patch("sudo_request.app.cli.install_commands.INSTALL_PREFIX") as install_prefix:
+                with patch("sudo_request.app.cli.install_commands.BIN_PATH") as bin_path:
+                    install_prefix.exists.return_value = False
+                    install_prefix.__truediv__.return_value = Path("/tmp/install/src")
+                    install_prefix.rglob.return_value = []
+                    bin_path.parent.mkdir.return_value = None
+                    with patch("sudo_request.app.cli.install_commands.copy_install_tree"):
+                        with patch("sudo_request.app.cli.install_commands.installed_python_path", return_value="/usr/bin/python3"):
+                            with patch("sudo_request.app.cli.install_commands.os.chown"):
+                                with patch("sudo_request.app.cli.install_commands.os.chmod"):
+                                    with patch("sudo_request.app.cli.install_commands.install_daemon", return_value=0):
+                                        with redirect_stdout(StringIO()) as stdout:
+                                            self.assertEqual(install_tool(), 0)
+
+        output = stdout.getvalue()
+        self.assertIn("Next:", output)
+        self.assertIn("sudo-request init", output)
+        self.assertIn("sudo-request doctor", output)
+        self.assertIn("sudo-request run -- /bin/echo ok", output)
 
 
 if __name__ == "__main__":

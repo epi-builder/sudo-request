@@ -58,9 +58,14 @@ at `/usr/local/bin/sudo-request`, and installs a launchd daemon.
 After install:
 
 ```bash
+sudo-request init
 sudo-request doctor
 sudo-request run -- /bin/echo ok
 ```
+
+Install only writes the root-owned tool files and launchd daemon. Telegram
+approval is not usable until the user-level config is created with
+`sudo-request init`.
 
 Reinstall from the checkout when the installed copy should be updated:
 
@@ -93,7 +98,16 @@ sudo sudo-request uninstall
 
 ## Config
 
-Create `~/.config/sudo-request/config.toml`:
+The recommended setup path is:
+
+```bash
+sudo-request init
+```
+
+It creates `~/.config/sudo-request/config.toml` and the Telegram bot token file.
+If config already exists, `init` reports the existing path and prompts again;
+press Enter to keep an existing token or allowed user id, or enter a new value
+to overwrite it. The resulting config has this shape:
 
 ```toml
 telegram_bot_token_file = "~/.config/sudo-request/telegram_bot_token"

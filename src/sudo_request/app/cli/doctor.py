@@ -17,18 +17,38 @@ SubprocessRun = Callable[..., subprocess.CompletedProcess[str]]
 
 def command_doctor(ipc_request: IPCRequest, sudo_runner: SubprocessRun = subprocess.run) -> int:
     home = Path.home()
-    print(f"config: {config_path(home)}")
+    exit_code = 0
+    config_incomplete = False
+    path = config_path(home)
     try:
+        if path.exists():
+            print(f"config: {path}")
+        else:
+            print(f"config: missing: {path}")
+            print("config: using defaults, but sudo-request run cannot approve requests yet")
+            exit_code = max(exit_code, 1)
+            config_incomplete = True
         cfg = load_config(home)
-        print("config: ok")
-        print(f"telegram token file: {cfg.telegram_bot_token_file} exists={cfg.telegram_bot_token_file.exists()}")
-        print(f"telegram allowed users: {len(cfg.telegram_allowed_user_ids)} configured")
+        if path.exists():
+            print("config: ok")
+        token_status, token_exit_code = telegram_token_status(cfg.telegram_bot_token_file)
+        print(token_status)
+        exit_code = max(exit_code, token_exit_code)
+        config_incomplete = config_incomplete or token_exit_code != 0
+        if cfg.telegram_allowed_user_ids:
+            print(f"telegram allowed users: {len(cfg.telegram_allowed_user_ids)} configured")
+        else:
+            print("telegram allowed users: ERROR none configured")
+            exit_code = max(exit_code, 1)
+            config_incomplete = True
         print(f"approval timeout: {cfg.approval_timeout_seconds}s")
         print(f"approval wait heartbeat: {cfg.approval_wait_heartbeat_seconds}s")
         print(f"broad window default: {cfg.broad_window_seconds_default}s")
         print(f"broad window max: {cfg.broad_window_seconds_max}s")
     except Exception as exc:
         print(f"config: error: {exc}")
+        exit_code = max(exit_code, 1)
+        config_incomplete = True
 
     print_path_check("daemon socket", SOCKET_PATH, required=False, expected_uid=0, exact_mode=0o666, kind="socket")
     print_path_check("daemon socket dir", SOCKET_DIR, required=False, expected_uid=0, max_mode=0o755, kind="dir")
@@ -51,7 +71,30 @@ def command_doctor(ipc_request: IPCRequest, sudo_runner: SubprocessRun = subproc
             print("WARNING: broad sudo rule exists but daemon reports no active request")
     except Exception as exc:
         print(f"daemon status: unavailable: {exc}")
-    return 0
+        exit_code = max(exit_code, 2)
+    if config_incomplete:
+        print("")
+        print("Next:")
+        print("  sudo-request init")
+    return exit_code
+
+
+def telegram_token_status(path: Path) -> tuple[str, int]:
+    if not path.exists():
+        return "telegram token file: missing", 1
+    try:
+        token = path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        return f"telegram token file: ERROR unreadable: {path} error={exc}", 1
+    if not token:
+        return f"telegram token file: ERROR empty: {path}", 1
+    try:
+        mode = stat.S_IMODE(path.stat().st_mode)
+    except OSError as exc:
+        return f"telegram token file: ERROR stat_failed: {path} error={exc}", 1
+    if mode_has_extra_bits(mode, 0o600):
+        return f"telegram token file: WARNING too_open: {path} mode={format_octal(mode)} max=0600", 1
+    return f"telegram token file: {path} exists=True mode={format_octal(mode)} status=ok", 0
 
 
 def print_path_check(
